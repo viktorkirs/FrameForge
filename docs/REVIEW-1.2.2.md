@@ -43,3 +43,5 @@ The local full suite covers capture, both encoders, audio sources, pause/resume,
 behavior. CI does not pretend to exercise GPU capture or physical audio devices on a hosted runner. A separate real-time endurance
 mode records a dedicated test window with pauses and resizing, logs process memory, scans encoded timestamps, and decodes the tail.
 An accelerated audio timeline test is distinct from a real-time recording; results must be reported separately.
+Container frame counts are checked separately from submitted frames: the Media Foundation path may fill timestamp gaps with
+repeated frames. Submitted, skipped and container counts must be reconciled instead of requiring strict count equality.

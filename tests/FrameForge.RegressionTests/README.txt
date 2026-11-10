@@ -43,3 +43,4 @@ exercises pauses/resizing and records memory samples. A tiny start/end tone keep
 audio path testable. At the end it verifies encoded durations and decodes the tail.
 The two-hour virtual timeline check is not a real-time endurance recording.
 Add --software to run the endurance recorder through CPU readback and software H.264.
+Add --stress-resize for a short stress run with a pause every 5 s and resize every 10 s.

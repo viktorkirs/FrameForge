@@ -37,7 +37,9 @@ internal static partial class Program
         var watch = Stopwatch.StartNew();
         var samples = new List<object>();
         long nextLog = 0, lastWritten = -1, maximumPrivate = 0;
-        int nextPause = 300, nextResize = 600, pauses = 0, resizes = 0;
+        int pauseInterval = args.Contains("--stress-resize") ? 5 : 300;
+        int resizeInterval = args.Contains("--stress-resize") ? 10 : 600;
+        int nextPause = pauseInterval, nextResize = resizeInterval, pauses = 0, resizes = 0;
         try
         {
             nint hwnd = new WindowInteropHelper(target).Handle;
@@ -56,13 +58,13 @@ internal static partial class Program
                 if (elapsed >= nextPause)
                 {
                     engine.Pause(); Wait(Task.Delay(1200)); engine.Resume();
-                    pauses++; nextPause += 300;
+                    pauses++; nextPause += pauseInterval;
                 }
                 if (elapsed >= nextResize)
                 {
                     target.Width = resizes % 2 == 0 ? 800 : 640;
                     target.Height = resizes % 2 == 0 ? 300 : 360;
-                    resizes++; nextResize += 600;
+                    resizes++; nextResize += resizeInterval;
                 }
                 if (elapsed >= nextLog)
                 {
@@ -88,7 +90,9 @@ internal static partial class Program
             StreamTimeline video = MediaTimelineProbe.Read(path);
             StreamTimeline audio = MediaTimelineProbe.Read(path, audio: true);
             double drift = Math.Abs(video.End100Ns - audio.End100Ns) / 10_000_000d;
-            Check(video.Samples == result.WrittenFrames && drift < .15, $"Long recording A/V drift: {drift:F4}s");
+            Check(video.Samples >= result.WrittenFrames && video.Samples <= result.WrittenFrames + result.DroppedFrames + 1,
+                $"Unexpected container frame count: encoded={video.Samples}, submitted={result.WrittenFrames}, skipped={result.DroppedFrames}");
+            Check(drift < .15, $"Long recording A/V duration drift: {drift:F4}s");
             TimeSpan tail = TimeSpan.FromTicks(Math.Max(0, video.End100Ns - TimeSpan.TicksPerSecond * 2));
             Mp4Probe decoded = Mp4Probe.Read(path, 8, seek: tail, maxSamples: 12);
             AudioProbe decodedAudio = AudioProbe.Read(path, seek: tail, maxDuration: TimeSpan.FromSeconds(2));
@@ -96,6 +100,7 @@ internal static partial class Program
             var report = new { State = "passed", WallSeconds = watch.Elapsed.TotalSeconds, TargetSeconds = seconds,
                 VideoSeconds = video.End100Ns / 10_000_000d, AudioSeconds = audio.End100Ns / 10_000_000d, DriftSeconds = drift,
                 result.WrittenFrames, result.DroppedFrames, result.RepeatedFrames, result.SystemAudioPackets, Pauses = pauses, Resizes = resizes,
+                ContainerFrames = video.Samples, FilledFrames = video.Samples - result.WrittenFrames,
                 Encoder = result.EncoderName, result.HardwareEncoder,
                 MaximumPrivateBytes = maximumPrivate, FileBytes = new FileInfo(path).Length, File = path };
             File.WriteAllText(statusPath, JsonSerializer.Serialize(report));
@@ -107,6 +112,10 @@ internal static partial class Program
         {
             player.Stop();
             Wait(Task.Run(engine.Stop));
+            File.WriteAllText(Path.Combine(_output, "recorder-result.json"), JsonSerializer.Serialize(new
+            {
+                WallSeconds = watch.Elapsed.TotalSeconds, Pauses = pauses, Resizes = resizes, Result = engine.LastResult
+            }, new JsonSerializerOptions { WriteIndented = true }));
             File.WriteAllText(Path.Combine(_output, "memory-samples.json"), JsonSerializer.Serialize(samples));
             target.Close();
         }

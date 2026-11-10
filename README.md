@@ -74,6 +74,8 @@ exercise pauses and resizing, log memory, and decode the final video/audio sampl
 the selected system audio output. Settings used by regression tests are isolated from your application settings.
 Local recordings, test artifacts, build output and signing keys are excluded from Git.
 
+Recorded results for 1.2.2: [full validation report](docs/VALIDATION-1.2.2.md).
+
 ## Current limits and next steps
 
 PNG/JPEG image sequences and interval capture are not implemented yet. A PNG screenshot is a separate feature.
