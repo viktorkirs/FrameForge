@@ -9,7 +9,7 @@ See licenses/NAudio-LICENSE.txt.
 Vortice.Windows 3.8.3 and Vortice.Mathematics 2.1.0 — Amer Koleci and contributors — MIT.
 https://github.com/amerkoleci/Vortice.Windows
 https://github.com/amerkoleci/Vortice.Mathematics
-See licenses/Vortice.Windows-LICENSE.txt.
+See licenses/Vortice.Windows-LICENSE.txt and licenses/Vortice.Mathematics-LICENSE.txt.
 
 SharpGen.Runtime 2.4.2-beta — Alexandre Mutel, Jeremy Koritzinsky, Amer Koleci and contributors — MIT.
 https://github.com/SharpGenTools/SharpGenTools

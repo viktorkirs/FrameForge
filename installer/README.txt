@@ -29,7 +29,7 @@ Optional Authenticode signing (not enabled for ordinary builds):
   pwsh -File installer\Build-Installer.ps1 -Sign -CertificateThumbprint <40-hex-thumbprint> -SignToolPath "C:\...\signtool.exe"
 
 Use a valid code-signing certificate with its private key in CurrentUser\My and the
-Windows SDK signing tool. The script uses SHA256 and an HTTPS RFC3161 timestamp.
+Windows SDK signing tool. The script uses SHA256 and an RFC3161 timestamp.
 It signs the app before packaging and configures Inno Setup to sign the installer
 and uninstaller. Every signature is verified. Missing signing inputs fail the build;
 it never silently falls back to an unsigned result when -Sign was requested.

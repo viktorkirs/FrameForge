@@ -141,16 +141,16 @@ internal static partial class Program
             BgraFrame grown = engine.CopyCurrentFrame()!;
             DpiScale dpi = VisualTreeHelper.GetDpi(target);
             Check(grown.Width == ((int)(700 * dpi.DpiScaleX) & ~1) && grown.Height == ((int)(240 * dpi.DpiScaleY) & ~1), "Capture resources did not grow with the window");
-            target.Width = 260; target.Height = 380;
+            target.Width = 262; target.Height = 382;
             Wait(Task.Delay(800));
             BgraFrame shrunk = engine.CopyCurrentFrame()!;
-            Check(shrunk.Width == ((int)(260 * dpi.DpiScaleX) & ~1) && shrunk.Height == ((int)(380 * dpi.DpiScaleY) & ~1), "Capture resources did not shrink with the window");
+            Check(shrunk.Width == (int)(262 * dpi.DpiScaleX) && shrunk.Height == (int)(382 * dpi.DpiScaleY), "Capture resources did not preserve the complete, possibly odd-sized window");
             target.Width = 400; target.Height = 300;
             Wait(Task.Delay(650));
             Wait(Task.Run(engine.Stop));
             Check(engine.LastResult is { Error: null }, "Resize recording failed: " + engine.LastResult?.Error);
             CheckWindowCorners(Mp4Probe.Read(path, 20), 700, 240);
-            CheckWindowCorners(Mp4Probe.Read(path, 47), 260, 380);
+            CheckWindowCorners(Mp4Probe.Read(path, 47), 262, 382);
             CheckWindowCorners(Mp4Probe.Read(path, 70), 400, 300);
         }
         finally { Wait(Task.Run(engine.Stop)); target.Close(); }

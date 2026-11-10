@@ -71,8 +71,8 @@ sealed class WgcCapture : IDisposable
     static WgcCapture StartItem(GraphicsDevice device, GraphicsCaptureItem item, bool captureCursor, int fps, string kind)
     {
         SizeInt32 poolSize = item.Size;
-        int width = Math.Max(2, poolSize.Width & ~1);
-        int height = Math.Max(2, poolSize.Height & ~1);
+        int width = Math.Max(2, poolSize.Width);
+        int height = Math.Max(2, poolSize.Height);
         Direct3D11CaptureFramePool pool = Direct3D11CaptureFramePool.CreateFreeThreaded(
             device.WinRtDevice,
             DirectXPixelFormat.B8G8R8A8UIntNormalized,
@@ -155,8 +155,8 @@ sealed class WgcCapture : IDisposable
                 }
                 using (latest)
                 {
-                    int contentWidth = size.Width & ~1;
-                    int contentHeight = size.Height & ~1;
+                    int contentWidth = size.Width;
+                    int contentHeight = size.Height;
                     using ID3D11Texture2D source = CaptureInterop.GetTexture(latest.Surface);
                     if (source.Description.Width < contentWidth || source.Description.Height < contentHeight) return;
                     ID3D11Texture2D? replacement = null;

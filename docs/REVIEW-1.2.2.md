@@ -5,7 +5,8 @@
 1. **Window resizing.** Capture textures were fixed at startup, `ContentSize` was clamped, and the frame pool was never resized.
    The capture now retires the transitional frame, recreates its pool at the new size, and publishes a complete new texture.
    Recording consumes an owned snapshot and rebuilds size-dependent overlay and scaler resources. The output MP4 canvas remains
-   fixed, with aspect-preserving letterboxing. Growing, shrinking and restoring a window are checked using both encoders.
+   fixed, with aspect-preserving letterboxing. BGRA capture retains odd source dimensions; only the video canvas is aligned to even
+   dimensions. Growing, shrinking and restoring a window are checked using both encoders.
 2. **Software readback.** The engine allocated a staging texture ahead of time but did not use it: its hot path called the
    allocating FrameGrabber helpers and optionally allocated another scaled array. A dedicated FrameReadback now reuses its
    staging texture and output array and combines crop, scale and letterboxing in one mapped copy. The software encoder still

@@ -5,7 +5,7 @@ param(
     [switch]$Sign,
     [string]$CertificateThumbprint = $env:FRAMEFORGE_SIGN_CERT_SHA1,
     [string]$SignToolPath = $env:FRAMEFORGE_SIGNTOOL_PATH,
-    [string]$TimestampServer = 'https://timestamp.digicert.com'
+    [string]$TimestampServer = 'http://timestamp.digicert.com'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +24,9 @@ if ($Sign) {
         throw 'Signing requires a valid code-signing certificate with an accessible private key.'
     }
     if (-not $SignToolPath -or -not (Test-Path -LiteralPath $SignToolPath)) { throw 'Supply the Windows SDK signtool.exe path with -SignToolPath.' }
-    if ($TimestampServer -notmatch '^https://') { throw 'Use an HTTPS RFC3161 timestamp server.' }
+    $timestampUri = $null
+    if (-not [Uri]::TryCreate($TimestampServer, [UriKind]::Absolute, [ref]$timestampUri) -or
+        $timestampUri.Scheme -notin @('http', 'https')) { throw 'Supply an HTTP(S) RFC3161 timestamp URL.' }
 }
 
 if (-not $IsccPath) {
