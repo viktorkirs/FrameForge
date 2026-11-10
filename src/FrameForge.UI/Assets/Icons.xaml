@@ -1,156 +1,36 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <DrawingImage x:Key="IconScreen">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,-3,30,30"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m27.75 0h-25.5c-1.243 0-2.25 1.008-2.25 2.25v15c0 1.243 1.008 2.25 2.25 2.25h11.489v1.499h-7.499c-.828 0-1.5.672-1.5 1.5s.672 1.5 1.5 1.5h18c.828 0 1.5-.672 1.5-1.5s-.672-1.5-1.5-1.5h-7.501v-1.5h11.011c1.242 0 2.249-1.007 2.25-2.25v-15c0-1.243-1.007-2.25-2.25-2.25zm-.75 16.5h-24v-13.5h24z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconWindow">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,0,24,24"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="M21 15h2v2h-2v-2zm0-4h2v2h-2v-2zm2 8h-2v2c1 0 2-1 2-2zM13 3h2v2h-2V3zm8 4h2v2h-2V7zm0-4v2h2c0-1-1-2-2-2zM1 7h2v2H1V7zm16-4h2v2h-2V3zm0 16h2v2h-2v-2zM3 3C2 3 1 4 1 5h2V3zm6 0h2v2H9V3zM5 3h2v2H5V3zm-4 8v8c0 1.1.9 2 2 2h12V11H1zm2 8l2.5-3.21 1.79 2.15 2.5-3.22L13 19H3z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconRegion">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,0,24,24"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Geometry="M4 9.00006L4 6.00006C4 4.89549 4.89543 4.00006 6 4.00006L9 4.00006">
-          <GeometryDrawing.Pen>
-            <Pen Brush="White" Thickness="2.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/>
-          </GeometryDrawing.Pen>
-        </GeometryDrawing>
-        <GeometryDrawing Geometry="M20 15.0001V18.0001C20 19.1046 19.1046 20.0001 18 20.0001H15">
-          <GeometryDrawing.Pen>
-            <Pen Brush="White" Thickness="2.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/>
-          </GeometryDrawing.Pen>
-        </GeometryDrawing>
-        <GeometryDrawing Geometry="M15 4.00006L18 4.00006C19.1046 4.00006 20 4.89549 20 6.00006L20 9.00006">
-          <GeometryDrawing.Pen>
-            <Pen Brush="White" Thickness="2.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/>
-          </GeometryDrawing.Pen>
-        </GeometryDrawing>
-        <GeometryDrawing Geometry="M9 20.0001L6 20.0001C4.89543 20.0001 4 19.1046 4 18.0001L4 15.0001">
-          <GeometryDrawing.Pen>
-            <Pen Brush="White" Thickness="2.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/>
-          </GeometryDrawing.Pen>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconVolume">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,-5.5,35,35"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m15.881.133-8.791 5.055v13.625l8.791 5.055c.726.416 1.572-.202 1.572-1.145v-21.444c0-.945-.847-1.564-1.572-1.145z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m6 5.727-4.926.01c-.606.057-1.076.562-1.076 1.178 0 .028.001.057.003.085v-.004 10.256c-.002.025-.003.055-.003.084 0 .609.467 1.109 1.062 1.162h.004 4.935v-12.772z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m26.289 11.863v.009c0 .876-.265 1.691-.719 2.367l.01-.015c-.447.7-1.089 1.241-1.85 1.551l-.026.009c-.112.052-.244.082-.383.082-.012 0-.024 0-.036-.001h.002c-.004 0-.008 0-.012 0-.289 0-.551-.118-.739-.308-.195-.186-.317-.448-.317-.738 0-.007 0-.015 0-.022v.001c0-.008 0-.017 0-.026 0-.216.076-.413.202-.568l-.001.002c.137-.163.296-.302.475-.412l.008-.005q.284-.175.567-.384c.204-.159.367-.36.479-.591l.004-.01c.126-.277.199-.6.199-.941s-.073-.664-.205-.955l.006.015c-.116-.241-.28-.441-.48-.598l-.004-.003q-.284-.209-.567-.384c-.187-.115-.347-.254-.481-.414l-.002-.003c-.125-.153-.201-.351-.201-.567 0-.009 0-.018 0-.027v.001c0-.006 0-.014 0-.021 0-.29.121-.552.316-.738.189-.191.45-.309.739-.309h.012-.001c.01 0 .023-.001.035-.001.139 0 .27.03.388.085l-.006-.002c.791.311 1.435.851 1.868 1.539l.009.016c.445.666.709 1.484.709 2.365v.001zm4.272 0v.037c0 1.743-.53 3.362-1.437 4.706l.019-.03c-.907 1.396-2.188 2.48-3.701 3.125l-.054.02c-.123.05-.267.08-.417.082h-.001c-.005 0-.011 0-.018 0-.294 0-.56-.121-.75-.317-.195-.187-.317-.45-.317-.741 0-.003 0-.007 0-.01v.001c0-.001 0-.002 0-.003 0-.439.267-.815.648-.976l.007-.003c.493-.243.908-.488 1.303-.759l-.035.023c1.595-1.174 2.619-3.045 2.619-5.154s-1.024-3.98-2.601-5.142l-.018-.012c-.36-.249-.776-.494-1.208-.709l-.06-.027c-.387-.163-.655-.54-.655-.979 0-.001 0-.002 0-.003.008-.586.481-1.06 1.067-1.068h.001c.156 0 .305.03.442.085l-.008-.003c1.567.665 2.848 1.749 3.735 3.113l.019.032c.888 1.314 1.418 2.933 1.418 4.676v.039-.002zm4.271 0c-.008 5.249-3.161 9.76-7.676 11.749l-.082.032c-.129.052-.278.082-.434.082-.586-.008-1.06-.481-1.068-1.067v-.001c.017-.435.277-.804.648-.979l.007-.003c.1-.055.223-.114.351-.166l.025-.009c.152-.061.276-.12.395-.185l-.02.01c.531-.287.978-.569 1.405-.877l-.038.026c1.343-.993 2.424-2.262 3.176-3.727l.028-.06c.726-1.403 1.151-3.063 1.151-4.822s-.426-3.419-1.179-4.882l.028.06c-.779-1.526-1.861-2.794-3.175-3.767l-.029-.02c-.39-.282-.837-.564-1.302-.818l-.066-.033c-.1-.055-.223-.114-.35-.166l-.025-.009c-.152-.061-.276-.12-.395-.185l.02.01c-.377-.177-.637-.547-.654-.98v-.002c.005-.589.479-1.066 1.066-1.074h.001c.156 0 .305.03.442.085l-.008-.003c4.597 2.021 7.751 6.532 7.759 11.781v.001z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconMicrophone">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,0,24,24"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Geometry="M19 10V12C19 15.866 15.866 19 12 19M5 10V12C5 15.866 8.13401 19 12 19M12 19V22M8 22H16M12 15C10.3431 15 9 13.6569 9 12V5C9 3.34315 10.3431 2 12 2C13.6569 2 15 3.34315 15 5V12C15 13.6569 13.6569 15 12 15Z">
-          <GeometryDrawing.Pen>
-            <Pen Brush="White" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/>
-          </GeometryDrawing.Pen>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconCamera">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,-2,28,28"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m13.846 9.692c2.293.004 4.15 1.862 4.154 4.154v.004c0 2.294-1.86 4.154-4.154 4.154s-4.154-1.86-4.154-4.154c0-1.148.466-2.187 1.218-2.939.728-.753 1.747-1.22 2.876-1.22h.063-.003zm10.154-6h.055c1.002 0 1.908.414 2.554 1.081l.001.001c.668.647 1.082 1.553 1.082 2.555v.058-.003 12.924c-.001 2.039-1.653 3.691-3.692 3.692h-20.308c-2.039-.001-3.691-1.653-3.692-3.692v-12.923c0-.016 0-.036 0-.055 0-1.002.414-1.908 1.081-2.554l.001-.001c.647-.668 1.553-1.082 2.555-1.082h.058-.003 3.23l.735-1.962c.212-.507.557-.922.993-1.213l.01-.006c.411-.311.929-.501 1.49-.512h.002 7.385c.564.011 1.081.201 1.499.517l-.006-.005c.445.297.791.712.996 1.201l.007.018.735 1.962zm-10.154 16.616c.027 0 .059.001.091.001 1.755 0 3.341-.727 4.472-1.896l.002-.002c1.171-1.133 1.897-2.719 1.897-4.474 0-.032 0-.064-.001-.096v.005c0-.027.001-.06.001-.092 0-1.755-.727-3.341-1.896-4.472l-.002-.002c-1.167-1.172-2.781-1.897-4.565-1.897s-3.398.725-4.565 1.896c-1.171 1.133-1.897 2.719-1.897 4.474 0 .032 0 .064.001.096v-.005c0 .028-.001.061-.001.094 0 1.755.726 3.34 1.894 4.471l.002.002c1.133 1.171 2.719 1.897 4.474 1.897.033 0 .065 0 .097-.001h-.005z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconSettings">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,0,24,24"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m10.5 0h3l.75 4.5 1.28.53 3.97-2.56 2.03 2.03-2.56 3.97.53 1.28 4.499.75v3l-4.5.75-.53 1.28 2.56 3.97-2.03 2.03-3.97-2.56-1.28.53-.75 4.499h-3l-.75-4.5-1.28-.53-3.97 2.56-2.031-2.03 2.56-3.97-.53-1.28-4.499-.75v-3l4.5-.75.53-1.28-2.56-3.97 2.03-2.031 3.97 2.56 1.28-.53zm1.5 7.5c-2.485 0-4.5 2.015-4.5 4.5s2.015 4.5 4.5 4.5 4.5-2.015 4.5-4.5c0-2.485-2.015-4.5-4.5-4.5z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
-  <DrawingImage x:Key="IconFolder">
-    <DrawingImage.Drawing>
-      <DrawingGroup>
-        <GeometryDrawing Brush="#00FFFFFF">
-          <GeometryDrawing.Geometry>
-            <RectangleGeometry Rect="0,-1,26,26"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="White">
-          <GeometryDrawing.Geometry>
-            <PathGeometry FillRule="Nonzero" Figures="m.061 8.78 4.801 14.399c.164.481.611.82 1.138.821h19.199c.048 0 .095-.003.141-.009l-.006.001.036-.006c.033-.005.066-.01.094-.018l.038-.009c.031-.008.062-.018.094-.028l.036-.013c.031-.012.061-.025.094-.041l.029-.014c.044-.023.08-.044.114-.068l-.004.003c.04-.027.074-.053.106-.081l-.002.001.028-.025c.023-.021.045-.042.067-.064l.031-.034c.021-.023.04-.047.058-.072l.017-.021.008-.012q.034-.048.063-.1l.007-.011c.019-.033.038-.073.055-.115l.003-.008.007-.019q.021-.052.036-.106c0-.012.007-.024.009-.037.008-.03.014-.06.02-.094 0-.015.005-.03.007-.045s.006-.057.008-.085 0-.034 0-.051 0-.015 0-.023v-21.596c0-.661-.534-1.197-1.193-1.2h-9.6c-.663 0-1.2.537-1.2 1.2v1.2h-8.4c-.663 0-1.2.537-1.2 1.2v3.6h-3.599-.001c-.662 0-1.199.537-1.199 1.199 0 .135.022.266.064.387l-.003-.008zm23.938-6.38v13.003l-2.462-7.385c-.164-.481-.611-.821-1.138-.821h-13.199v-2.397h8.4c.663 0 1.2-.537 1.2-1.2v-1.199zm-21.134 7.2h16.67l4 12h-16.67z"/>
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-      </DrawingGroup>
-    </DrawingImage.Drawing>
-  </DrawingImage>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Original FrameForge icon geometry, MIT licensed with the project. -->
+  <Pen x:Key="FrameForgeIconPen" Brush="White" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/>
+  <DrawingImage x:Key="IconScreen"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M4,5 H28 V23 H4 Z M16,23 V28 M10,28 H22"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconWindow"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M4,5 H28 V27 H4 Z M4,11 H28 M8,8 H9 M13,8 H14"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconRegion"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M4,12 V4 H12 M20,4 H28 V12 M28,20 V28 H20 M12,28 H4 V20 M10,16 H22 M16,10 V22"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconVolume"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M4,12 H10 L17,6 V26 L10,20 H4 Z M21,11 Q27,16 21,21 M25,6 Q35,16 25,26"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconMicrophone"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M12,7 Q12,3 16,3 Q20,3 20,7 V16 Q20,20 16,20 Q12,20 12,16 Z M7,14 V16 Q7,25 16,25 Q25,25 25,16 V14 M16,25 V29 M11,29 H21"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconCamera"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M4,9 H10 L12,5 H20 L22,9 H28 V27 H4 Z M22,18 A6,6 0 1 1 10,18 A6,6 0 1 1 22,18 M24,12 H25"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconSettings"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M24,16 A8,8 0 1 1 8,16 A8,8 0 1 1 24,16 M19,16 A3,3 0 1 1 13,16 A3,3 0 1 1 19,16 M16,3 V7 M16,25 V29 M3,16 H7 M25,16 H29 M7,7 L10,10 M22,22 L25,25 M7,25 L10,22 M22,10 L25,7"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="IconFolder"><DrawingImage.Drawing><DrawingGroup>
+    <GeometryDrawing Brush="Transparent"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,32,32"/></GeometryDrawing.Geometry></GeometryDrawing>
+    <GeometryDrawing Pen="{StaticResource FrameForgeIconPen}" Geometry="M3,8 H13 L16,11 H29 V27 H3 Z M3,13 H29"/>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
 </ResourceDictionary>

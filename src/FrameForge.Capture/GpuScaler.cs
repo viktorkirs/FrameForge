@@ -48,6 +48,7 @@ sealed class GpuScaler : IDisposable
     readonly int _outputHeight;
     readonly int _inputWidth;
     readonly int _inputHeight;
+    readonly bool _preserveAspect;
     (int X, int Y, int Width, int Height) _crop;
     readonly ID3D11Buffer _cropBuffer;
     readonly ID3D11Buffer[] _cropSlot;
@@ -62,13 +63,15 @@ sealed class GpuScaler : IDisposable
         int cropX = 0,
         int cropY = 0,
         int cropWidth = 0,
-        int cropHeight = 0)
+        int cropHeight = 0,
+        bool preserveAspect = false)
     {
         _device = device;
         _outputWidth = outputWidth;
         _outputHeight = outputHeight;
         _inputWidth = inputWidth;
         _inputHeight = inputHeight;
+        _preserveAspect = preserveAspect;
         if (cropWidth <= 0 || cropHeight <= 0)
         {
             cropX = 0;
@@ -140,6 +143,8 @@ sealed class GpuScaler : IDisposable
     }
 
     public ID3D11Texture2D Source { get; }
+    public int InputWidth => _inputWidth;
+    public int InputHeight => _inputHeight;
 
     public void UpdateCrop(int x, int y, int width, int height)
     {
@@ -195,8 +200,12 @@ sealed class GpuScaler : IDisposable
         context.PSSetShader(_pixelShader);
         context.PSSetSampler(0, _sampler);
         context.PSSetShaderResource(0, _sourceView);
-        context.RSSetViewport(0, 0, _outputWidth, _outputHeight);
+        ScreenRect destination = _preserveAspect
+            ? FrameLayout.Fit(_crop.Width, _crop.Height, _outputWidth, _outputHeight)
+            : new ScreenRect(0, 0, _outputWidth, _outputHeight);
+        context.RSSetViewport(destination.X, destination.Y, destination.Width, destination.Height);
         context.OMSetRenderTargets(_slots[index].View, null);
+        context.ClearRenderTargetView(_slots[index].View, new Vortice.Mathematics.Color4(0, 0, 0, 1));
         context.Draw(3, 0);
         context.OMSetRenderTargets(Array.Empty<ID3D11RenderTargetView>(), null);
         context.PSSetShaderResource(0, null!);

@@ -24,3 +24,14 @@ actual installer executable and leaves existing recorder settings unchanged.
 
 Installer engine: https://jrsoftware.org/
 Compiler package: https://www.nuget.org/packages/Tools.InnoSetup/6.7.3
+
+Optional Authenticode signing (not enabled for ordinary builds):
+  pwsh -File installer\Build-Installer.ps1 -Sign -CertificateThumbprint <40-hex-thumbprint> -SignToolPath "C:\...\signtool.exe"
+
+Use a valid code-signing certificate with its private key in CurrentUser\My and the
+Windows SDK signing tool. The script uses SHA256 and an HTTPS RFC3161 timestamp.
+It signs the app before packaging and configures Inno Setup to sign the installer
+and uninstaller. Every signature is verified. Missing signing inputs fail the build;
+it never silently falls back to an unsigned result when -Sign was requested.
+No certificate, private key or password belongs in the repository. The signing
+path must be exercised with the publisher's real certificate before signed release.

@@ -1,0 +1,45 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore FrameForge.slnx
+      - name: Build
+        run: dotnet build FrameForge.slnx -c Release --no-restore
+      - name: Core and audio timeline checks
+        run: dotnet run --project tests/FrameForge.RegressionTests -c Release --no-build -- artifacts/ci --headless
+      - name: Build self-contained installer
+        shell: pwsh
+        run: ./installer/Build-Installer.ps1
+      - name: Upload installer and test report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: FrameForge-windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/FrameForge-Setup-*-x64.exe
+            dist/FrameForge-Setup-*-x64.exe.sha256
+            artifacts/ci/regression-result.txt

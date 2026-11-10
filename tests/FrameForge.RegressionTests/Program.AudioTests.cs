@@ -15,6 +15,12 @@ internal static partial class Program
 {
     static void RunAudioUnitTests()
     {
+        RunAudioTimelineTests();
+        Test("compact settings keep all tabs and the Save button inside a small window", TabbedSettings);
+    }
+
+    static void RunAudioTimelineTests()
+    {
         Test("audio mixer sums sources and preserves silent gaps", () =>
         {
             var timeline = new AudioTimeline(2);
@@ -58,7 +64,6 @@ internal static partial class Program
             timeline.ReadPcm(pcm);
             Check(pcm.All(value => value == 0), "Old audio replayed after ring buffer wrap");
         });
-        Test("compact settings keep all tabs and the Save button inside a small window", TabbedSettings);
     }
 
     static void TabbedSettings()

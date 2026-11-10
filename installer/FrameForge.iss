@@ -46,6 +46,12 @@ OutputBaseFilename=FrameForge-Setup-{#AppVersion}-x64
 Compression=lzma2/max
 SolidCompression=yes
 LZMANumBlockThreads=2
+#ifdef SignBuild
+SignTool=frameforge
+SignedUninstaller=yes
+SignedUninstallerDir={#RepoRoot}\artifacts\signed-uninstallers
+SignToolRunMinimized=yes
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

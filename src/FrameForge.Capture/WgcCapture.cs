@@ -18,7 +18,8 @@ sealed class WgcCapture : IDisposable
     readonly Direct3D11CaptureFramePool _pool;
     readonly GraphicsCaptureSession _session;
     readonly GraphicsCaptureItem _item;
-    readonly ID3D11Texture2D _latest;
+    ID3D11Texture2D _latest;
+    SizeInt32 _poolSize;
     readonly object _gate = new();
     readonly ManualResetEventSlim _firstFrame = new(false);
     int _width;
@@ -28,13 +29,14 @@ sealed class WgcCapture : IDisposable
     int _closed;
     bool _disposed;
 
-    WgcCapture(GraphicsDevice device, GraphicsCaptureItem item, Direct3D11CaptureFramePool pool, GraphicsCaptureSession session, ID3D11Texture2D latest, int width, int height)
+    WgcCapture(GraphicsDevice device, GraphicsCaptureItem item, Direct3D11CaptureFramePool pool, GraphicsCaptureSession session, ID3D11Texture2D latest, int width, int height, SizeInt32 poolSize)
     {
         _device = device;
         _item = item;
         _pool = pool;
         _session = session;
         _latest = latest;
+        _poolSize = poolSize;
         _width = width;
         _height = height;
         _item.Closed += OnItemClosed;
@@ -46,7 +48,6 @@ sealed class WgcCapture : IDisposable
     public int Height => _height;
     public long Generation => Interlocked.Read(ref _generation);
     public bool IsClosed => Volatile.Read(ref _closed) != 0;
-    public ID3D11Texture2D Latest => _latest;
 
     public static WgcCapture Start(GraphicsDevice device, MonitorInfo monitor, bool captureCursor, int fps)
     {
@@ -69,13 +70,14 @@ sealed class WgcCapture : IDisposable
 
     static WgcCapture StartItem(GraphicsDevice device, GraphicsCaptureItem item, bool captureCursor, int fps, string kind)
     {
-        int width = Math.Max(2, item.Size.Width & ~1);
-        int height = Math.Max(2, item.Size.Height & ~1);
+        SizeInt32 poolSize = item.Size;
+        int width = Math.Max(2, poolSize.Width & ~1);
+        int height = Math.Max(2, poolSize.Height & ~1);
         Direct3D11CaptureFramePool pool = Direct3D11CaptureFramePool.CreateFreeThreaded(
             device.WinRtDevice,
             DirectXPixelFormat.B8G8R8A8UIntNormalized,
             3,
-            item.Size);
+            poolSize);
         GraphicsCaptureSession session = pool.CreateCaptureSession(item);
         session.IsCursorCaptureEnabled = captureCursor;
         if (ApiInformation.IsPropertyPresent("Windows.Graphics.Capture.GraphicsCaptureSession", "IsBorderRequired"))
@@ -95,7 +97,7 @@ sealed class WgcCapture : IDisposable
             MiscFlags = ResourceOptionFlags.None
         });
 
-        var capture = new WgcCapture(device, item, pool, session, latest, width, height);
+        var capture = new WgcCapture(device, item, pool, session, latest, width, height, poolSize);
         Log.Info($"WGC started {kind} {width}x{height} cursor={captureCursor} target={fps}fps");
         return capture;
     }
@@ -104,70 +106,111 @@ sealed class WgcCapture : IDisposable
 
     public bool WaitForFrame(TimeSpan timeout) => _firstFrame.Wait(timeout);
 
-    public void CopyLatestTo(ID3D11Texture2D destination)
+    public long CopyLatest(ref ID3D11Texture2D? destination)
     {
         lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (destination == null || destination.Description.Width != _width || destination.Description.Height != _height)
+            {
+                ID3D11Texture2D replacement = _device.Device.CreateTexture2D(_latest.Description);
+                destination?.Dispose();
+                destination = replacement;
+            }
             _device.Context.CopyResource(destination, _latest);
+            return _generation;
+        }
     }
 
     void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
     {
-        if (_disposed)
-            return;
-
-        try
+        lock (_gate)
         {
-            Direct3D11CaptureFrame? latest = null;
-            while (true)
+            if (_disposed) return;
+            try
             {
-                Direct3D11CaptureFrame? frame = sender.TryGetNextFrame();
-                if (frame == null)
-                    break;
-                latest?.Dispose();
-                latest = frame;
-            }
-
-            if (latest == null)
-                return;
-
-            using (latest)
-            {
-                int contentWidth = Math.Max(2, latest.ContentSize.Width & ~1);
-                int contentHeight = Math.Max(2, latest.ContentSize.Height & ~1);
-                contentWidth = Math.Min(contentWidth, _width);
-                contentHeight = Math.Min(contentHeight, _height);
-                using ID3D11Texture2D source = CaptureInterop.GetTexture(latest.Surface);
-                lock (_gate)
+                Direct3D11CaptureFrame? latest = null;
+                while (true)
                 {
-                    _device.Context.CopySubresourceRegion(
-                        _latest,
-                        0,
-                        0,
-                        0,
-                        0,
-                        source,
-                        0,
-                        new Vortice.Mathematics.Box(0, 0, 0, contentWidth, contentHeight, 1));
+                    Direct3D11CaptureFrame? frame = sender.TryGetNextFrame();
+                    if (frame == null)
+                        break;
+                    latest?.Dispose();
+                    latest = frame;
                 }
-            }
 
-            Interlocked.Increment(ref _generation);
-            _firstFrame.Set();
-        }
-        catch (Exception ex)
-        {
-            if (Interlocked.Increment(ref _frameErrors) <= 3)
-                Log.Error("Ошибка кадра захвата.", ex);
+                if (latest == null)
+                    return;
+
+                SizeInt32 size = latest.ContentSize;
+                if (size.Width < 2 || size.Height < 2) { latest.Dispose(); return; }
+                if (size.Width != _poolSize.Width || size.Height != _poolSize.Height)
+                {
+                    // The first frame announcing a larger size still has the old pool's
+                    // surface. Retire it before Recreate and wait for a complete new frame.
+                    latest.Dispose();
+                    sender.Recreate(_device.WinRtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 3, size);
+                    _poolSize = size;
+                    return;
+                }
+                using (latest)
+                {
+                    int contentWidth = size.Width & ~1;
+                    int contentHeight = size.Height & ~1;
+                    using ID3D11Texture2D source = CaptureInterop.GetTexture(latest.Surface);
+                    if (source.Description.Width < contentWidth || source.Description.Height < contentHeight) return;
+                    ID3D11Texture2D? replacement = null;
+                    if (_width != contentWidth || _height != contentHeight)
+                    {
+                        Texture2DDescription description = _latest.Description;
+                        description.Width = (uint)contentWidth;
+                        description.Height = (uint)contentHeight;
+                        replacement = _device.Device.CreateTexture2D(description);
+                    }
+                    try
+                    {
+                        _device.Context.CopySubresourceRegion(
+                            replacement ?? _latest,
+                            0,
+                            0,
+                            0,
+                            0,
+                            source,
+                            0,
+                            new Vortice.Mathematics.Box(0, 0, 0, contentWidth, contentHeight, 1));
+                        if (replacement != null)
+                        {
+                            _latest.Dispose();
+                            _latest = replacement;
+                            replacement = null;
+                            _width = contentWidth;
+                            _height = contentHeight;
+                            Log.Info($"WGC resized {contentWidth}x{contentHeight}");
+                        }
+                    }
+                    finally { replacement?.Dispose(); }
+                }
+
+                Interlocked.Increment(ref _generation);
+                _firstFrame.Set();
+            }
+            catch (Exception ex)
+            {
+                if (Interlocked.Increment(ref _frameErrors) <= 3)
+                    Log.Error("Ошибка кадра захвата.", ex);
+            }
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-        _disposed = true;
-        _item.Closed -= OnItemClosed;
-        _pool.FrameArrived -= OnFrameArrived;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _item.Closed -= OnItemClosed;
+            _pool.FrameArrived -= OnFrameArrived;
+        }
         _session.Dispose();
         _pool.Dispose();
         _latest.Dispose();

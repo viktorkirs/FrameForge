@@ -9,7 +9,8 @@ public sealed class AudioTimeline
     readonly int _capacity;
     readonly float[][] _samples;
     readonly long[][] _tags;
-    readonly List<(long Start, long End)> _pauses = [];
+    readonly List<(long Start, long End, long RemovedBefore)> _pauses = [];
+    long _removedTicks;
     long _epoch;
     long? _pauseStart;
     long _readFrame;
@@ -40,7 +41,9 @@ public sealed class AudioTimeline
         {
             if (_pauseStart is long start)
             {
-                _pauses.Add((start, Math.Max(start, qpc100Ns)));
+                long end = Math.Max(start, qpc100Ns);
+                _pauses.Add((start, end, _removedTicks));
+                _removedTicks += end - start;
                 _pauseStart = null;
             }
         }
@@ -53,30 +56,57 @@ public sealed class AudioTimeline
         lock (_gate)
         {
             if (!_started) return;
-            for (int i = 0; i < stereo.Length / Channels; i++)
+            int frames = stereo.Length / Channels;
+            int i = IndexAtOrAfter(_epoch, qpc100Ns, frames);
+            if (i >= frames) return;
+            long firstWall = qpc100Ns + i * 10_000_000L / SampleRate;
+            int low = 0, high = _pauses.Count;
+            while (low < high)
+            {
+                int middle = low + (high - low) / 2;
+                if (_pauses[middle].End <= firstWall) low = middle + 1; else high = middle;
+            }
+            int pauseIndex = low;
+            long removed = pauseIndex == _pauses.Count ? _removedTicks : _pauses[pauseIndex].RemovedBefore;
+            while (i < frames)
             {
                 long wall = qpc100Ns + i * 10_000_000L / SampleRate;
-                if (wall < _epoch) continue;
-                long removed = 0;
-                bool paused = _pauseStart is long active && wall >= active;
-                foreach ((long start, long end) in _pauses)
+                if (_pauseStart is long active && wall >= active) break;
+                if (pauseIndex < _pauses.Count && wall >= _pauses[pauseIndex].Start)
                 {
-                    if (wall >= end) removed += end - start;
-                    else if (wall >= start) { paused = true; break; }
-                    else break;
+                    var pause = _pauses[pauseIndex++];
+                    i = Math.Max(i, IndexAtOrAfter(pause.End, qpc100Ns, frames));
+                    removed = pause.RemovedBefore + pause.End - pause.Start;
+                    continue;
                 }
-                if (paused) continue;
-                long frame = (long)Math.Round((wall - _epoch - removed) * (SampleRate / 10_000_000d));
-                if (frame < _readFrame) continue;
-                if (frame - _readFrame >= _capacity)
-                    throw new InvalidOperationException(Loc.Get("AudioBufferOverflow"));
-                int slot = (int)(frame % _capacity);
-                _tags[source][slot] = frame;
-                float left = stereo[i * Channels], right = stereo[i * Channels + 1];
-                _samples[source][slot * Channels] = float.IsFinite(left) ? left : 0;
-                _samples[source][slot * Channels + 1] = float.IsFinite(right) ? right : 0;
+                int until = frames;
+                if (pauseIndex < _pauses.Count) until = Math.Min(until, IndexAtOrAfter(_pauses[pauseIndex].Start, qpc100Ns, frames));
+                if (_pauseStart is long pending) until = Math.Min(until, IndexAtOrAfter(pending, qpc100Ns, frames));
+                // Only pause boundaries require timeline lookup. Retain the exact
+                // original 100 ns rounding within each contiguous active block.
+                for (; i < until; i++)
+                {
+                    wall = qpc100Ns + i * 10_000_000L / SampleRate;
+                    long frame = (long)Math.Round((wall - _epoch - removed) * (SampleRate / 10_000_000d));
+                    if (frame < _readFrame) continue;
+                    if (frame - _readFrame >= _capacity)
+                        throw new InvalidOperationException(Loc.Get("AudioBufferOverflow"));
+                    int slot = (int)(frame % _capacity);
+                    _tags[source][slot] = frame;
+                    float left = stereo[i * Channels], right = stereo[i * Channels + 1];
+                    _samples[source][slot * Channels] = float.IsFinite(left) ? left : 0;
+                    _samples[source][slot * Channels + 1] = float.IsFinite(right) ? right : 0;
+                }
             }
         }
+    }
+
+    static int IndexAtOrAfter(long boundary, long packetStart, int frames)
+    {
+        if (boundary <= packetStart) return 0;
+        Int128 index = ((Int128)boundary - packetStart) * SampleRate;
+        index = (index + 9_999_999) / 10_000_000;
+        return index >= frames ? frames : (int)index;
     }
 
     public void ReadPcm(Span<short> stereo)

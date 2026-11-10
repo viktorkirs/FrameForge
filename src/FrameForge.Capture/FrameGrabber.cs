@@ -23,7 +23,13 @@ public static class FrameGrabber
             waited += TimeSpan.FromMilliseconds(20);
         }
 
-        return ReadTexture(device, capture.Latest, capture.Width, capture.Height, maxEdge);
+        ID3D11Texture2D? snapshot = null;
+        try
+        {
+            capture.CopyLatest(ref snapshot);
+            return ReadTexture(device, snapshot!, (int)snapshot!.Description.Width, (int)snapshot.Description.Height, maxEdge);
+        }
+        finally { snapshot?.Dispose(); }
     }
 
     public static BgraFrame ReadTexture(GraphicsDevice device, ID3D11Texture2D source, int width, int height, int maxEdge)

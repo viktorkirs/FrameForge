@@ -6,6 +6,7 @@ dotnet run --project tests\FrameForge.RegressionTests -c Release -- artifacts\ve
 Requires Windows, .NET 10 SDK, an interactive desktop and a connected monitor.
 The --capture checks additionally require a working hardware H.264 encoder.
 Without --capture, the shutdown check still makes a short recording with automatic encoder selection.
+Use --headless for CI checks that require no WPF desktop, GPU capture or audio device.
 
 Settings and logs are isolated in the test executable's portable data folder.
 Videos and the final result are written to the supplied output folder.
@@ -30,3 +31,14 @@ precise dragging, cursor profile persistence and the settings layout on short sc
 The --audio checks require an active output device and microphone. They briefly play
 a quiet 997 Hz test tone and record each selected source locally, verify the AAC
 track by decoding it, check mixing and pause synchronization, and test source errors.
+
+Additional audit checks cover repeated window resizing with aspect-preserving fit,
+GPU/CPU resource recreation, decoder row padding, reusable 1080p CPU readback buffers,
+sample-exact audio pause boundaries and an accelerated two-hour/7200-pause timeline.
+
+Real-time endurance mode, default one hour:
+dotnet run --project tests\FrameForge.RegressionTests -c Release -- artifacts\endurance --long-recording --seconds 3600
+It captures a dedicated test window and the selected system output (microphone off),
+exercises pauses/resizing and records memory samples. A tiny start/end tone keeps the
+audio path testable. At the end it verifies encoded durations and decodes the tail.
+The two-hour virtual timeline check is not a real-time endurance recording.

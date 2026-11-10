@@ -1,0 +1,31 @@
+FrameForge Recorder
+Copyright (c) 2026 Victor Kirsanov. Project code is licensed under MIT (LICENSE).
+Third-party components retain their own notices and license terms.
+
+NAudio 3.3.0 — Mark Heath and contributors — MIT.
+https://github.com/naudio/NAudio
+See licenses/NAudio-LICENSE.txt.
+
+Vortice.Windows 3.8.3 and Vortice.Mathematics 2.1.0 — Amer Koleci and contributors — MIT.
+https://github.com/amerkoleci/Vortice.Windows
+https://github.com/amerkoleci/Vortice.Mathematics
+See licenses/Vortice.Windows-LICENSE.txt.
+
+SharpGen.Runtime 2.4.2-beta — Alexandre Mutel, Jeremy Koritzinsky, Amer Koleci and contributors — MIT.
+https://github.com/SharpGenTools/SharpGenTools
+See licenses/SharpGenTools-LICENSE.txt.
+
+Microsoft .NET runtime, Windows Desktop runtime and System.Numerics.Tensors — Microsoft and contributors — MIT,
+with additional third-party notices. The installer build includes the license and notices from
+the exact runtime packages selected by dotnet publish in licenses/.
+https://github.com/dotnet/runtime
+https://github.com/dotnet/wpf
+
+Windows SDK .NET projections / WinRT.Runtime — Microsoft.
+https://github.com/microsoft/CsWinRT
+https://aka.ms/WinSDKLicenseURL
+Windows platform components and SDK redistributables retain their original Microsoft terms.
+
+The installer engine is Inno Setup by Jordan Russell and Martijn Laan.
+https://jrsoftware.org/
+Compiler package (build dependency): https://www.nuget.org/packages/Tools.InnoSetup/6.7.3

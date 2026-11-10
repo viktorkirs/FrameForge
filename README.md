@@ -1,67 +1,87 @@
 # FrameForge Recorder
 
-Программа для Windows: запись экрана, отдельного окна или выбранной области в MP4.
+[English](README.md) · [Русский](README.ru.md)
 
-Изготовитель: **Victor Kirsanov**.
+A Windows screen recorder built with .NET 10, WPF, Windows Graphics Capture and Media Foundation.
+Created by **Victor Kirsanov**. Licensed under [MIT](LICENSE).
 
-## Установка
+## Download and install
 
-Скачайте `FrameForge-Setup-<версия>-x64.exe` из [релизов](https://github.com/viktorkirs/FrameForge/releases).
-Установщик включает .NET, создаёт ярлык в меню «Пуск» и предлагает ярлык на рабочем столе.
-Установка выполняется для текущего пользователя. Удаление доступно через настройки Windows;
-видеозаписи и настройки сохраняются.
+Download `FrameForge-Setup-<version>-x64.exe` from [Releases](https://github.com/viktorkirs/FrameForge/releases).
+The installer includes the .NET runtime, installs for the current user, adds a Start menu shortcut,
+and offers an optional desktop shortcut. Uninstalling preserves your settings and recordings.
 
-Требуется Windows 10 версии 2004 или новее либо Windows 11, совместимая с x64.
+The installer requires x64-compatible Windows 10 build 19041 or later, or Windows 11.
+Screen capture and hardware encoding depend on the available graphics drivers and hardware.
 
-## Возможности
+## Features
 
-- Запись монитора, окна или области; аппаратное и программное кодирование H.264.
-- Системный звук и микрофон, выбор устройств и круглые индикаторы уровня звука.
-- Пауза, скриншоты и настраиваемые горячие клавиши.
-- Перемещение выбранной области и редактирование её размера до записи.
-- Выбор окон с миниатюрами и поиском.
-- Плавный курсор с инерцией, дугой или спиральной траекторией.
-- Временный жёлтый маркер: включите его в **Настройки → Курсор**, удерживайте
-  **Alt + левую кнопку мыши** для рисования; отпустите Alt для очистки.
-- Интерфейс на русском, английском и немецком языках.
+- Record a monitor, an application window, or a selected screen region to H.264 MP4.
+- Capture system audio and microphone audio independently, with device selection and circular level meters.
+- Pause and resume, take PNG screenshots, and configure global keyboard shortcuts.
+- Move a selected region and edit its size before recording starts.
+- Find windows using live thumbnails and search.
+- Smooth the recorded cursor with acceleration, braking, arc and spiral paths.
+- Draw temporary yellow highlights: enable the marker in **Settings → Cursor**, hold **Alt + left mouse button**,
+  and release Alt to clear the drawing.
+- Russian, English and German interface.
 
-## Сборка
+When a captured window changes size, the full image is fitted into the recording's fixed canvas.
+Black bars preserve its aspect ratio; the MP4 resolution remains constant.
 
-На Windows с .NET 10 SDK:
+## Build
+
+Requirements: Windows and the .NET 10 SDK.
 
 ```powershell
 dotnet build FrameForge.slnx -c Release
 dotnet run --project src/FrameForge.UI -c Release
 ```
 
-Установщик (PowerShell 7+):
+Build the self-contained installer with PowerShell 7+:
 
 ```powershell
 pwsh -File installer/Build-Installer.ps1
 ```
 
-Готовый файл и контрольная сумма появятся в `dist/`.
-Инструкции по сборщику находятся в [installer/README.txt](installer/README.txt).
+The installer and its SHA256 checksum are written to `dist/`.
+[Installer documentation](installer/README.txt) includes optional Authenticode signing.
+Signing requires your own valid code-signing certificate; ordinary builds are unsigned.
 
-## Проверки
+## Verification
+
+CI builds the Windows solution, runs tests that do not need a desktop, and uploads an installer artifact:
+
+```powershell
+dotnet run --project tests/FrameForge.RegressionTests -c Release -- artifacts/verification --headless
+```
+
+On an interactive Windows desktop with a hardware H.264 encoder, output device and microphone:
 
 ```powershell
 dotnet run --project tests/FrameForge.RegressionTests -c Release -- artifacts/verification --capture --audio
-```
-
-Проверки захвата требуют интерактивного рабочего стола и аппаратного H.264-кодировщика.
-Аудиопроверки кратко воспроизводят тестовый тон и проверяют захват системного звука и микрофона.
-Результаты сохраняются локально в `artifacts/`, тестовые настройки изолированы от пользовательских.
-
-Проверка установщика после сборки:
-
-```powershell
 pwsh -File installer/Test-Installer.ps1
 ```
 
-Она устанавливает программу во временную папку, проверяет запуск и запись, повторную
-установку и удаление. Если FrameForge уже установлен, проверка прекращается,
-чтобы сохранить существующую установку.
+Real-time endurance recording (default: one hour, test window and system audio, microphone off):
 
-Используется NAudio; текст его лицензии находится в
-[src/FrameForge.UI/NAudio-LICENSE.txt](src/FrameForge.UI/NAudio-LICENSE.txt).
+```powershell
+dotnet run --project tests/FrameForge.RegressionTests -c Release -- artifacts/endurance --long-recording --seconds 3600
+```
+
+The audio checks briefly play a quiet test tone. Endurance checks record only the dedicated test window,
+exercise pauses and resizing, log memory, and decode the final video/audio samples. They still capture
+the selected system audio output. Settings used by regression tests are isolated from your application settings.
+Local recordings, test artifacts, build output and signing keys are excluded from Git.
+
+## Current limits and next steps
+
+PNG/JPEG image sequences and interval capture are not implemented yet. A PNG screenshot is a separate feature.
+MP4 is finalized on a normal stop, including handled errors and low-disk shutdown; process termination or
+power loss before finalization can still leave an incomplete file. Segmented or fragmented recording and
+crash-recovery tests are planned work. See the [technical review](docs/REVIEW-1.2.2.md).
+
+## License and acknowledgements
+
+FrameForge code is MIT licensed, copyright © 2026 Victor Kirsanov.
+Third-party components retain their own licenses; see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).

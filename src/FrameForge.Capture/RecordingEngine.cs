@@ -19,6 +19,10 @@ public sealed class RecordingEngine : IDisposable
     WgcCapture? _capture;
     FrameOverlay? _overlay;
     PointerTrack? _pointer;
+    ID3D11Texture2D? _source;
+    int _sourceWidth, _sourceHeight;
+    CaptureRequest? _request;
+    AppSettings? _captureSettings;
     int _cropX;
     int _cropY;
     int _cropWidth;
@@ -103,8 +107,8 @@ public sealed class RecordingEngine : IDisposable
             if (!_regionCapture || _capture == null || _stop ||
                 _snapshot.State is not (RecordingState.Recording or RecordingState.Paused))
                 return false;
-            _cropX = Math.Clamp(x, 0, Math.Max(0, _capture.Width - _cropWidth)) & ~1;
-            _cropY = Math.Clamp(y, 0, Math.Max(0, _capture.Height - _cropHeight)) & ~1;
+            _cropX = Math.Clamp(x, 0, Math.Max(0, _sourceWidth - _cropWidth)) & ~1;
+            _cropY = Math.Clamp(y, 0, Math.Max(0, _sourceHeight - _cropHeight)) & ~1;
             return true;
         }
     }
@@ -131,12 +135,12 @@ public sealed class RecordingEngine : IDisposable
 
         lock (_stateGate)
         {
-            if (_device == null || _capture == null)
+            if (_device == null || _source == null)
                 return null;
-            ID3D11Texture2D source = _overlay is { Ready: true } ? _overlay.Texture : _capture.Latest;
+            ID3D11Texture2D source = _overlay is { Ready: true } ? _overlay.Texture : _source;
             if (IsPartialCrop)
                 return FrameGrabber.ReadBox(_device, source, _cropX, _cropY, _cropWidth, _cropHeight, maxEdge);
-            return FrameGrabber.ReadTexture(_device, source, _capture.Width, _capture.Height, maxEdge);
+            return FrameGrabber.ReadTexture(_device, source, _sourceWidth, _sourceHeight, maxEdge);
         }
     }
 
@@ -144,7 +148,7 @@ public sealed class RecordingEngine : IDisposable
 
     bool IsPartialCrop =>
         _capture != null && _cropWidth >= 16 && _cropHeight >= 16
-        && (_cropX != 0 || _cropY != 0 || _cropWidth != _capture.Width || _cropHeight != _capture.Height);
+        && (_cropX != 0 || _cropY != 0 || _cropWidth != _sourceWidth || _cropHeight != _sourceHeight);
 
     void Run(
         CaptureRequest request,
@@ -159,7 +163,7 @@ public sealed class RecordingEngine : IDisposable
         Mp4VideoWriter? writer = null;
         AudioCapture? audio = null;
         GpuScaler? converter = null;
-        ID3D11Texture2D? bgraStaging = null;
+        FrameReadback? readback = null;
         var recent = new Queue<long>();
         long written = 0;
         long repeated = 0;
@@ -177,6 +181,8 @@ public sealed class RecordingEngine : IDisposable
         {
             bool smoothCursor = settings.SmoothCursor && settings.CaptureCursor;
             bool highlightClicks = settings.HighlightClicks;
+            _request = request;
+            _captureSettings = settings.Clone();
             MonitorInfo monitor = request.Monitor;
             _device = GraphicsDevice.CreateForMonitor(new MonitorHandle(monitor.Handle));
             bool captureCursor = settings.CaptureCursor && !smoothCursor;
@@ -200,42 +206,32 @@ public sealed class RecordingEngine : IDisposable
             if (!_capture.WaitForFrame(TimeSpan.FromSeconds(3)))
                 throw new TimeoutException(request.Window != 0 ? Loc.Get("NoFrameWindow") : Loc.Get("NoFrame"));
 
-            ResolveCrop(request);
+            lock (_stateGate) RefreshSource();
             (width, height) = OutputSize.Compute(_cropWidth, _cropHeight, settings.Resolution);
             if (settings.AutoBitrate)
                 bitrate = VideoBitrate.Compute(settings.Quality, width, height, fps);
             Log.Info($"Capture source {(_cropWidth == _capture.Width && _cropHeight == _capture.Height ? "full" : $"crop {_cropWidth}x{_cropHeight} at {_cropX},{_cropY}")} -> {width}x{height}");
 
-            if (highlightClicks || smoothCursor || settings.TemporaryMarker)
-            {
-                _overlay = new FrameOverlay(_device, _capture.Width, _capture.Height, settings.TemporaryMarker);
-                _pointer = new PointerTrack(monitor, _capture.Width, _capture.Height, smoothCursor, highlightClicks, request.Window,
-                    settings.CursorMotion, settings.CursorSmoothnessMilliseconds);
-                _pointer.Sample(Qpc.Now());
-                Log.Info($"Recording overlay clicks={highlightClicks} smoothCursor={smoothCursor}");
-            }
-
             if (settings.SystemAudio || settings.Microphone)
                 audio = new AudioCapture(settings);
             writer = Mp4VideoWriter.Open(_device.Device, outputPath, width, height, fps, bitrate, settings.Encoder, out warning, audio != null);
             Log.Info($"Encoder {writer.Encoder.Name} hardware={writer.Encoder.IsHardware} {width}x{height}@{fps} {bitrate} bps");
-            int readWidth = IsPartialCrop ? _cropWidth : _capture.Width;
-            int readHeight = IsPartialCrop ? _cropHeight : _capture.Height;
             if (writer.InputKind != FrameInputKind.CpuBgra)
             {
                 try
                 {
                     converter = new GpuScaler(
                         _device,
-                        _capture.Width,
-                        _capture.Height,
+                        _sourceWidth,
+                        _sourceHeight,
                         width,
                         height,
                         writer.Encoder.BindFlags,
                         _cropX,
                         _cropY,
                         _cropWidth,
-                        _cropHeight);
+                        _cropHeight,
+                        preserveAspect: request.Window != 0);
                 }
                 catch (Exception convertError) when (settings.Encoder != EncoderPreference.Hardware)
                 {
@@ -244,12 +240,12 @@ public sealed class RecordingEngine : IDisposable
                     try { File.Delete(outputPath); } catch { /* A new writer overwrites only when the path is free. */ }
                     writer = Mp4VideoWriter.Open(_device.Device, outputPath, width, height, fps, bitrate, EncoderPreference.Software, out _, audio != null);
                     warning = Loc.Get("SoftwareFallback");
-                    bgraStaging = CreateStaging(_device, readWidth, readHeight);
+                    readback = new FrameReadback(_device, width, height);
                 }
             }
             else
             {
-                bgraStaging = CreateStaging(_device, readWidth, readHeight);
+                readback = new FrameReadback(_device, width, height);
             }
 
             audio?.Start();
@@ -327,7 +323,7 @@ public sealed class RecordingEngine : IDisposable
                     repeated++;
                 seenGeneration = _capture.Generation;
 
-                bool wrote = WriteFrame(writer, converter, bgraStaging, frameIndex, fps, discontinuity: frameIndex == 0);
+                bool wrote = WriteFrame(writer, ref converter, readback, frameIndex, fps, discontinuity: frameIndex == 0);
                 if (!wrote)
                     dropped++;
                 else
@@ -421,21 +417,32 @@ public sealed class RecordingEngine : IDisposable
             try { audio?.Dispose(); } catch (Exception ex) { Log.Error("Audio cleanup.", ex); }
             writer?.Dispose();
             converter?.Dispose();
-            bgraStaging?.Dispose();
+            readback?.Dispose();
             FrameOverlay? overlay;
+            WgcCapture? capture;
+            GraphicsDevice? device;
+            ID3D11Texture2D? source;
             lock (_stateGate)
             {
                 overlay = _overlay;
                 _overlay = null;
                 _pointer = null;
+                source = _source;
+                _source = null;
+                capture = _capture;
+                _capture = null;
+                device = _device;
+                _device = null;
+                _sourceWidth = _sourceHeight = 0;
+                _request = null;
+                _captureSettings = null;
             }
 
             try { overlay?.Dispose(); } catch (Exception ex) { Log.Error("Не удалось закрыть оверлей.", ex); }
-            try { _capture?.Dispose(); } catch (Exception ex) { Log.Error("Не удалось закрыть захват.", ex); }
-            _capture = null;
+            source?.Dispose();
+            try { capture?.Dispose(); } catch (Exception ex) { Log.Error("Не удалось закрыть захват.", ex); }
             _cropX = _cropY = _cropWidth = _cropHeight = 0;
-            try { _device?.Dispose(); } catch (Exception ex) { Log.Error("Не удалось закрыть Direct3D.", ex); }
-            _device = null;
+            try { device?.Dispose(); } catch (Exception ex) { Log.Error("Не удалось закрыть Direct3D.", ex); }
 
             LastResult = new RecordingResult
             {
@@ -492,14 +499,14 @@ public sealed class RecordingEngine : IDisposable
 
         int cropX = 0;
         int cropY = 0;
-        int cropWidth = _capture.Width;
-        int cropHeight = _capture.Height;
+        int cropWidth = _sourceWidth;
+        int cropHeight = _sourceHeight;
         if (request.HasCrop)
         {
-            cropX = Math.Clamp(request.CropX, 0, Math.Max(0, _capture.Width - 2)) & ~1;
-            cropY = Math.Clamp(request.CropY, 0, Math.Max(0, _capture.Height - 2)) & ~1;
-            cropWidth = Math.Min(request.CropWidth & ~1, _capture.Width - cropX);
-            cropHeight = Math.Min(request.CropHeight & ~1, _capture.Height - cropY);
+            cropX = Math.Clamp(request.CropX, 0, Math.Max(0, _sourceWidth - 2)) & ~1;
+            cropY = Math.Clamp(request.CropY, 0, Math.Max(0, _sourceHeight - 2)) & ~1;
+            cropWidth = Math.Min(request.CropWidth & ~1, _sourceWidth - cropX);
+            cropHeight = Math.Min(request.CropHeight & ~1, _sourceHeight - cropY);
             cropWidth = Math.Max(2, cropWidth & ~1);
             cropHeight = Math.Max(2, cropHeight & ~1);
         }
@@ -510,7 +517,7 @@ public sealed class RecordingEngine : IDisposable
         _cropHeight = cropHeight;
     }
 
-    bool WriteFrame(Mp4VideoWriter writer, GpuScaler? converter, ID3D11Texture2D? staging, long frameIndex, int fps, bool discontinuity)
+    bool WriteFrame(Mp4VideoWriter writer, ref GpuScaler? converter, FrameReadback? readback, long frameIndex, int fps, bool discontinuity)
     {
         long timestamp = frameIndex * 10_000_000L / fps;
         long duration = ((frameIndex + 1) * 10_000_000L / fps) - timestamp;
@@ -522,6 +529,12 @@ public sealed class RecordingEngine : IDisposable
             lock (_stateGate)
             {
                 ID3D11Texture2D source = PrepareFrame();
+                if (converter.InputWidth != _sourceWidth || converter.InputHeight != _sourceHeight)
+                {
+                    converter.Dispose();
+                    converter = new GpuScaler(_device, _sourceWidth, _sourceHeight, _snapshot.Width, _snapshot.Height,
+                        writer.Encoder.BindFlags, _cropX, _cropY, _cropWidth, _cropHeight, preserveAspect: _request!.Window != 0);
+                }
                 converter.UpdateCrop(_cropX, _cropY, _cropWidth, _cropHeight);
                 _device.Context.CopyResource(converter.Source, source);
             }
@@ -541,22 +554,17 @@ public sealed class RecordingEngine : IDisposable
             }
         }
 
-        if (staging == null || _capture == null || _device == null)
+        if (readback == null || _capture == null || _device == null)
             return false;
 
-        BgraFrame frame;
         lock (_stateGate)
         {
             ID3D11Texture2D source = PrepareFrame();
-            frame = IsPartialCrop
-                ? FrameGrabber.ReadBox(_device, source, _cropX, _cropY, _cropWidth, _cropHeight, 0)
-                : FrameGrabber.ReadTexture(_device, source, _capture.Width, _capture.Height, 0);
+            BgraFrame frame = readback.Read(source, new ScreenRect(_cropX, _cropY, _cropWidth, _cropHeight), preserveAspect: _request!.Window != 0);
+            // WriteBgra copies synchronously into an MF-owned sample; the readback
+            // array remains ours and is safe to overwrite on the next frame.
+            writer.WriteBgra(frame.Pixels, timestamp, duration, discontinuity);
         }
-
-        if (frame.Width != _snapshot.Width || frame.Height != _snapshot.Height)
-            frame = ScaleFrame(frame, _snapshot.Width, _snapshot.Height);
-
-        writer.WriteBgra(frame.Pixels, timestamp, duration, discontinuity);
         return true;
     }
 
@@ -565,12 +573,43 @@ public sealed class RecordingEngine : IDisposable
         if (_capture == null)
             throw new InvalidOperationException(Loc.Get("NoFrame"));
 
+        RefreshSource();
         if (_overlay == null || _pointer == null)
-            return _capture.Latest;
+            return _source!;
 
         _pointer.Sample(Qpc.Now());
-        _overlay.Compose(_capture.Latest, _pointer, _markers?.Snapshot());
+        _overlay.Compose(_source!, _pointer, _markers?.Snapshot());
         return _overlay.Texture;
+    }
+
+    void RefreshSource()
+    {
+        _capture!.CopyLatest(ref _source);
+        int width = (int)_source!.Description.Width, height = (int)_source.Description.Height;
+        if (_sourceWidth == width && _sourceHeight == height) return;
+        bool resized = _sourceWidth != 0;
+        _sourceWidth = width;
+        _sourceHeight = height;
+        if (resized && _regionCapture)
+        {
+            _cropWidth = Math.Min(_cropWidth, width) & ~1;
+            _cropHeight = Math.Min(_cropHeight, height) & ~1;
+            _cropX = Math.Clamp(_cropX, 0, width - _cropWidth) & ~1;
+            _cropY = Math.Clamp(_cropY, 0, height - _cropHeight) & ~1;
+        }
+        else ResolveCrop(_request!);
+        _overlay?.Dispose();
+        _overlay = null;
+        _pointer = null;
+        AppSettings settings = _captureSettings!;
+        bool smooth = settings.SmoothCursor && settings.CaptureCursor;
+        if (smooth || settings.HighlightClicks || settings.TemporaryMarker)
+        {
+            _overlay = new FrameOverlay(_device!, width, height, settings.TemporaryMarker);
+            _pointer = new PointerTrack(_request!.Monitor, width, height, smooth, settings.HighlightClicks, _request.Window,
+                settings.CursorMotion, settings.CursorSmoothnessMilliseconds);
+        }
+        Log.Info($"Recording source resources {width}x{height}");
     }
 
     void PublishPreview()
@@ -586,44 +625,6 @@ public sealed class RecordingEngine : IDisposable
             Log.Error("Превью кадра не собралось.", ex);
         }
     }
-
-    static BgraFrame ScaleFrame(BgraFrame source, int width, int height)
-    {
-        if (width <= 0 || height <= 0)
-            return source;
-        var pixels = new byte[width * height * 4];
-        for (int y = 0; y < height; y++)
-        {
-            int sourceY = Math.Min(source.Height - 1, y * source.Height / height);
-            for (int x = 0; x < width; x++)
-            {
-                int sourceX = Math.Min(source.Width - 1, x * source.Width / width);
-                int from = ((sourceY * source.Width) + sourceX) * 4;
-                int to = ((y * width) + x) * 4;
-                pixels[to] = source.Pixels[from];
-                pixels[to + 1] = source.Pixels[from + 1];
-                pixels[to + 2] = source.Pixels[from + 2];
-                pixels[to + 3] = source.Pixels[from + 3];
-            }
-        }
-
-        return new BgraFrame { Width = width, Height = height, Pixels = pixels };
-    }
-
-    static ID3D11Texture2D CreateStaging(GraphicsDevice device, int width, int height) =>
-        device.Device.CreateTexture2D(new Texture2DDescription
-        {
-            Width = (uint)width,
-            Height = (uint)height,
-            MipLevels = 1,
-            ArraySize = 1,
-            Format = Vortice.DXGI.Format.B8G8R8A8_UNorm,
-            SampleDescription = new Vortice.DXGI.SampleDescription(1, 0),
-            Usage = ResourceUsage.Staging,
-            BindFlags = BindFlags.None,
-            CPUAccessFlags = CpuAccessFlags.Read,
-            MiscFlags = ResourceOptionFlags.None
-        });
 
     static RecordingSnapshot Copy(RecordingSnapshot source, RecordingState state, string? message) => new()
     {

@@ -26,6 +26,18 @@ internal static partial class Program
         Directory.CreateDirectory(_output);
         // Keep test settings and logs separate from the user's installed application.
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "portable.marker"), "");
+        if (args.Contains("--headless"))
+        {
+            try
+            {
+                RunAudioTimelineTests();
+                RunAuditCoreTests();
+                File.WriteAllText(Path.Combine(_output, "regression-result.txt"), $"PASS: {_passed} headless checks");
+                Console.WriteLine($"PASS: {_passed} headless checks");
+                return 0;
+            }
+            catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+        }
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         XElement source = XDocument.Load(Path.Combine(AppContext.BaseDirectory, "ThemeSource.xaml")).Root!;
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
@@ -37,6 +49,7 @@ internal static partial class Program
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
         try
         {
+            if (args.Contains("--long-recording")) return LongRecording(args);
             Test("hotkeys reject invalid keys and empty segments", () =>
             {
                 foreach (string text in new[] { "Ctrl+Ж", "Ctrl+١", "Ctrl++F9", "+F9", "F9+", "Ctrl+", "F25", "A+B" })
@@ -236,6 +249,7 @@ internal static partial class Program
             });
             Test("cursor settings keep choices across language changes and fit a short screen", CursorSettings);
             RunAudioUnitTests();
+            RunAuditCoreTests();
             RunMarkerMeterTests();
             Test("audio notice visibility follows toggles", () =>
             {
@@ -297,6 +311,9 @@ internal static partial class Program
                 Test("software recording follows region movement without changing video dimensions", () => MovingCapture(monitor, EncoderPreference.Software));
                 Test("hardware region recording includes yellow marker and clears it on release", () => RecordMarker(monitor, EncoderPreference.Hardware, false));
                 Test("software window recording includes yellow marker and clears it on release", () => RecordMarker(monitor, EncoderPreference.Software, true));
+                Test("readback reuses large CPU buffers and clears letterboxing", () => ReusableReadback(monitor));
+                Test("hardware window capture follows repeated resize without cropping", () => ResizingCapture(monitor, EncoderPreference.Hardware));
+                Test("software window capture follows repeated resize without cropping", () => ResizingCapture(monitor, EncoderPreference.Software));
             }
             if (args.Contains("--audio")) RunAudioCaptureTests();
             string report = $"PASS: {_passed} regression checks";

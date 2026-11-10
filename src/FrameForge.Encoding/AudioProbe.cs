@@ -15,7 +15,7 @@ public sealed class AudioProbe
     public double Peak { get; init; }
     public float[] PreviewMono { get; init; } = [];
 
-    public static unsafe AudioProbe Read(string path)
+    public static unsafe AudioProbe Read(string path, TimeSpan? seek = null, TimeSpan? maxDuration = null)
     {
         MediaFoundationStartup.Ensure();
         using IMFSourceReader reader = MediaFactory.MFCreateSourceReaderFromURL(path, null!);
@@ -35,7 +35,9 @@ public sealed class AudioProbe
             output.Set(MediaTypeAttributeKeys.AudioBlockAlignment, 4u).CheckError();
             output.Set(MediaTypeAttributeKeys.AudioAvgBytesPerSecond, (uint)(AudioTimeline.SampleRate * 4)).CheckError();
             reader.SetCurrentMediaType((int)SourceReaderIndex.FirstAudioStream, output);
+            if (seek is TimeSpan position) reader.SetCurrentPosition(position.Ticks);
             long frames = 0, duration = 0;
+            long? firstTimestamp = null;
             double sumSquares = 0, peak = 0;
             var preview = new List<float>();
             while (true)
@@ -44,6 +46,8 @@ public sealed class AudioProbe
                     out _, out SourceReaderFlag flags, out long timestamp);
                 if (flags.HasFlag(SourceReaderFlag.EndOfStream)) break;
                 if (sample == null) continue;
+                firstTimestamp ??= timestamp;
+                if (maxDuration is TimeSpan limit && timestamp - firstTimestamp.Value >= limit.Ticks) break;
                 using IMFMediaBuffer buffer = sample.ConvertToContiguousBuffer();
                 buffer.Lock(out nint pointer, out _, out int length);
                 try
