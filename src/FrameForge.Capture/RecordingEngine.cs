@@ -531,9 +531,7 @@ public sealed class RecordingEngine : IDisposable
                 ID3D11Texture2D source = PrepareFrame();
                 if (converter.InputWidth != _sourceWidth || converter.InputHeight != _sourceHeight)
                 {
-                    converter.Dispose();
-                    converter = new GpuScaler(_device, _sourceWidth, _sourceHeight, _snapshot.Width, _snapshot.Height,
-                        writer.Encoder.BindFlags, _cropX, _cropY, _cropWidth, _cropHeight, preserveAspect: _request!.Window != 0);
+                    converter.ResizeInput(_sourceWidth, _sourceHeight);
                 }
                 converter.UpdateCrop(_cropX, _cropY, _cropWidth, _cropHeight);
                 _device.Context.CopyResource(converter.Source, source);

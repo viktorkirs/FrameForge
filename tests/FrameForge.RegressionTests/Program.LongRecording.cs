@@ -42,7 +42,7 @@ internal static partial class Program
         {
             nint hwnd = new WindowInteropHelper(target).Handle;
             Wait(Task.Run(() => engine.Start(new CaptureRequest { Monitor = monitor, Window = hwnd }, path,
-                new AppSettings { Fps = 30, Encoder = EncoderPreference.Hardware, AutoBitrate = false, ManualBitrateMbps = 2,
+                new AppSettings { Fps = 30, Encoder = args.Contains("--software") ? EncoderPreference.Software : EncoderPreference.Hardware, AutoBitrate = false, ManualBitrateMbps = 2,
                     SystemAudio = true, Microphone = false, CaptureCursor = false, TemporaryMarker = true })));
             watch.Restart();
             player.Play();
@@ -96,6 +96,7 @@ internal static partial class Program
             var report = new { State = "passed", WallSeconds = watch.Elapsed.TotalSeconds, TargetSeconds = seconds,
                 VideoSeconds = video.End100Ns / 10_000_000d, AudioSeconds = audio.End100Ns / 10_000_000d, DriftSeconds = drift,
                 result.WrittenFrames, result.DroppedFrames, result.RepeatedFrames, result.SystemAudioPackets, Pauses = pauses, Resizes = resizes,
+                Encoder = result.EncoderName, result.HardwareEncoder,
                 MaximumPrivateBytes = maximumPrivate, FileBytes = new FileInfo(path).Length, File = path };
             File.WriteAllText(statusPath, JsonSerializer.Serialize(report));
             File.WriteAllText(Path.Combine(_output, "long-recording-result.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));

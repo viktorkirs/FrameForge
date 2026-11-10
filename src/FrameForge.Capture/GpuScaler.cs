@@ -39,15 +39,15 @@ sealed class GpuScaler : IDisposable
     readonly GraphicsDevice _device;
     readonly ID3D11VertexShader _vertexShader;
     readonly ID3D11PixelShader _pixelShader;
-    readonly ID3D11ShaderResourceView _sourceView;
+    ID3D11ShaderResourceView _sourceView;
     readonly ID3D11SamplerState _sampler;
     readonly Slot[] _slots;
     readonly bool[] _busy;
     readonly object _gate = new();
     readonly int _outputWidth;
     readonly int _outputHeight;
-    readonly int _inputWidth;
-    readonly int _inputHeight;
+    int _inputWidth;
+    int _inputHeight;
     readonly bool _preserveAspect;
     (int X, int Y, int Width, int Height) _crop;
     readonly ID3D11Buffer _cropBuffer;
@@ -142,9 +142,29 @@ sealed class GpuScaler : IDisposable
         }
     }
 
-    public ID3D11Texture2D Source { get; }
+    public ID3D11Texture2D Source { get; private set; }
     public int InputWidth => _inputWidth;
     public int InputHeight => _inputHeight;
+
+    public void ResizeInput(int width, int height)
+    {
+        if (width == _inputWidth && height == _inputHeight) return;
+        Texture2DDescription description = Source.Description;
+        description.Width = (uint)width;
+        description.Height = (uint)height;
+        ID3D11Texture2D replacement = _device.Device.CreateTexture2D(description);
+        ID3D11ShaderResourceView view;
+        try { view = _device.Device.CreateShaderResourceView(replacement); }
+        catch { replacement.Dispose(); throw; }
+        _sourceView.Dispose();
+        Source.Dispose();
+        Source = replacement;
+        _sourceView = view;
+        _inputWidth = width;
+        _inputHeight = height;
+        _crop = default; // UVs depend on the input size even when the crop rectangle is unchanged.
+        // Keep the eight encoder-facing surfaces and their in-flight leases intact.
+    }
 
     public void UpdateCrop(int x, int y, int width, int height)
     {

@@ -312,6 +312,7 @@ internal static partial class Program
                 Test("hardware region recording includes yellow marker and clears it on release", () => RecordMarker(monitor, EncoderPreference.Hardware, false));
                 Test("software window recording includes yellow marker and clears it on release", () => RecordMarker(monitor, EncoderPreference.Software, true));
                 Test("readback reuses large CPU buffers and clears letterboxing", () => ReusableReadback(monitor));
+                Test("GPU resize keeps encoder surfaces and in-flight leases intact", () => ScalerResizeLeases(monitor));
                 Test("hardware window capture follows repeated resize without cropping", () => ResizingCapture(monitor, EncoderPreference.Hardware));
                 Test("software window capture follows repeated resize without cropping", () => ResizingCapture(monitor, EncoderPreference.Software));
             }

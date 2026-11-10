@@ -10,3 +10,5 @@ data/
 portable.marker
 *.pfx
 *.p12
+*.key
+*.pem

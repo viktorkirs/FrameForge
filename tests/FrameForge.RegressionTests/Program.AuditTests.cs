@@ -114,6 +114,38 @@ internal static partial class Program
         Console.WriteLine($"  readback: {allocated} managed bytes / 60 scaled 1080p frames");
     }
 
+    static void ScalerResizeLeases(MonitorInfo monitor)
+    {
+        using GraphicsDevice device = GraphicsDevice.CreateForMonitor(new MonitorHandle(monitor.Handle));
+        Type type = typeof(RecordingEngine).Assembly.GetType("FrameForge.Capture.GpuScaler")!;
+        using var scaler = (IDisposable)Activator.CreateInstance(type, [device, 640, 480, 320, 240, BindFlags.None, 0, 0, 640, 480, true])!;
+        var convert = type.GetMethod("TryConvert")!;
+        var slots = new List<ID3D11Texture2D>();
+        var releases = new List<Action>();
+        try
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                object?[] output = [null, null];
+                Check((bool)convert.Invoke(scaler, output)!, "Encoder surface pool exhausted early");
+                slots.Add((ID3D11Texture2D)output[0]!); releases.Add((Action)output[1]!);
+            }
+            for (int i = 0; i < 40; i++)
+            {
+                type.GetMethod("ResizeInput")!.Invoke(scaler, [i % 2 == 0 ? 1001 : 640, i % 2 == 0 ? 751 : 480]);
+                type.GetMethod("UpdateCrop")!.Invoke(scaler, [0, 0, 320, 240]);
+                object?[] busy = [null, null];
+                Check(!(bool)convert.Invoke(scaler, busy)!, "Resize replaced encoder surfaces that were still leased");
+            }
+            for (int i = 0; i < releases.Count; i++) releases[i]();
+            releases.Clear();
+            object?[] next = [null, null];
+            Check((bool)convert.Invoke(scaler, next)! && ReferenceEquals(slots[0], next[0]), "Resize changed the fixed encoder output texture identity");
+            ((Action)next[1]!).Invoke();
+        }
+        finally { foreach (Action release in releases) release(); }
+    }
+
     static void ResizingCapture(MonitorInfo monitor, EncoderPreference encoder)
     {
         var grid = new Grid();

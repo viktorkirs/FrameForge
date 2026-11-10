@@ -12,6 +12,8 @@
     <Product>FrameForge Recorder</Product>
     <Company>Victor Kirsanov</Company>
     <Authors>Victor Kirsanov</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/viktorkirs/FrameForge</RepositoryUrl>
     <Copyright>Copyright © Victor Kirsanov</Copyright>
   </PropertyGroup>
 </Project>

@@ -7,6 +7,7 @@
    Recording consumes an owned snapshot and rebuilds size-dependent overlay and scaler resources. The output MP4 canvas remains
    fixed, with aspect-preserving letterboxing. BGRA capture retains odd source dimensions; only the video canvas is aligned to even
    dimensions. Growing, shrinking and restoring a window are checked using both encoders.
+   The scaler keeps its fixed-size encoder output pool across input changes, replacing only input resources and UV mapping.
 2. **Software readback.** The engine allocated a staging texture ahead of time but did not use it: its hot path called the
    allocating FrameGrabber helpers and optionally allocated another scaled array. A dedicated FrameReadback now reuses its
    staging texture and output array and combines crop, scale and letterboxing in one mapped copy. The software encoder still
