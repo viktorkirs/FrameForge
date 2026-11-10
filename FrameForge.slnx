@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FrameForge.Capture/FrameForge.Capture.csproj" />
+    <Project Path="src/FrameForge.Core/FrameForge.Core.csproj" />
+    <Project Path="src/FrameForge.Diagnostics/FrameForge.Diagnostics.csproj" />
+    <Project Path="src/FrameForge.Encoding/FrameForge.Encoding.csproj" />
+    <Project Path="src/FrameForge.UI/FrameForge.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FrameForge.RegressionTests/FrameForge.RegressionTests.csproj" />
+  </Folder>
+</Solution>

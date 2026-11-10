@@ -1,0 +1,182 @@
+<Window x:Class="FrameForge.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:FrameForge.UI"
+        Title="{Binding [Settings], Source={x:Static local:TextTable.Instance}}"
+        Width="700" Height="580" MinWidth="440" MinHeight="340"
+        WindowStartupLocation="CenterOwner" WindowStyle="None" ResizeMode="CanResize"
+        Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}" ShowInTaskbar="False">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+  <Window.Resources>
+    <Style TargetType="TabItem">
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Padding" Value="8,8"/>
+      <Setter Property="Margin" Value="2,0"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="MinHeight" Value="36"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabItem">
+            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+              <ContentPresenter x:Name="TabHeader" ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                TextElement.Foreground="{StaticResource MutedBrush}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{StaticResource CardHoverBrush}"/></Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="#FF263956"/>
+                <Setter Property="BorderBrush" Value="#FF466995"/>
+                <Setter TargetName="TabHeader" Property="TextElement.Foreground" Value="White"/>
+                <Setter TargetName="TabHeader" Property="TextElement.FontWeight" Value="SemiBold"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="#FF8EB4FF"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="TabControl">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabControl">
+            <Grid>
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+              <Border x:Name="SettingsNavigation" Background="#FF101620" BorderBrush="#FF2A3445" BorderThickness="1"
+                      CornerRadius="12" Padding="4" Margin="0,0,0,18">
+                <UniformGrid Rows="1" IsItemsHost="True"/>
+              </Border>
+              <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="1" ContentSource="SelectedContent"/>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+  <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="20">
+    <Grid>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Border x:Name="SettingsTitleBar" Background="Transparent" MouseLeftButtonDown="Title_MouseLeftButtonDown" Margin="0,0,0,18"
+              AutomationProperties.AutomationId="SettingsTitleBar" AutomationProperties.Name="SettingsTitleBar">
+        <DockPanel>
+          <Button Content="×" Width="30" Height="30" Padding="0" DockPanel.Dock="Right" Click="Cancel_Click" ToolTip="{Binding [Close], Source={x:Static local:TextTable.Instance}}"/>
+          <TextBlock Text="{Binding [SettingsTitle], Source={x:Static local:TextTable.Instance}}" FontSize="21" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </DockPanel>
+      </Border>
+
+      <TabControl x:Name="SettingsTabs" Grid.Row="1">
+        <TabItem x:Name="VideoTab" Header="{Binding [VideoTab], Source={x:Static local:TextTable.Instance}}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,8,0">
+              <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <StackPanel Grid.ColumnSpan="2" Margin="0,0,0,12">
+                <TextBlock Text="{Binding [Monitor], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+                <ComboBox x:Name="MonitorBox" DisplayMemberPath="Label"/>
+              </StackPanel>
+              <StackPanel Grid.Row="1" Margin="0,0,8,12">
+                <TextBlock Text="{Binding [Fps], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+                <ComboBox x:Name="FpsBox"/>
+              </StackPanel>
+              <StackPanel Grid.Row="1" Grid.Column="1" Margin="8,0,0,12">
+                <TextBlock Text="{Binding [Resolution], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+                <ComboBox x:Name="ResolutionBox"/>
+              </StackPanel>
+              <StackPanel Grid.Row="2" Margin="0,0,8,12">
+                <TextBlock Text="{Binding [QualityLevel], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+                <ComboBox x:Name="QualityBox"/>
+              </StackPanel>
+              <StackPanel Grid.Row="2" Grid.Column="1" Margin="8,0,0,12">
+                <TextBlock Text="{Binding [Encoder], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+                <ComboBox x:Name="EncoderBox"/>
+              </StackPanel>
+              <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,2,0,0">
+                <CheckBox x:Name="AutoBitrateBox" Content="{Binding [AutoBitrate], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,10"/>
+                <StackPanel Orientation="Horizontal">
+                  <TextBox x:Name="BitrateBox" Width="80"/>
+                  <TextBlock Text="{Binding [Mbps], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+          </ScrollViewer>
+        </TabItem>
+
+        <TabItem x:Name="AudioTab" Header="{Binding [AudioTab], Source={x:Static local:TextTable.Instance}}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,0">
+              <CheckBox x:Name="SystemAudioBox" Content="{Binding [SystemAudio], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,8"/>
+              <TextBlock Text="{Binding [SystemAudioDevice], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+              <ComboBox x:Name="SystemAudioDeviceBox" Margin="0,0,0,22" IsEnabled="{Binding IsChecked, ElementName=SystemAudioBox}"/>
+              <CheckBox x:Name="MicrophoneBox" Content="{Binding [Microphone], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,8"/>
+              <TextBlock Text="{Binding [MicrophoneDevice], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+              <ComboBox x:Name="MicrophoneDeviceBox" Margin="0,0,0,18" IsEnabled="{Binding IsChecked, ElementName=MicrophoneBox}"/>
+              <TextBlock Text="{Binding [AudioSettingsHint], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <TabItem x:Name="CursorTab" Header="{Binding [CursorTab], Source={x:Static local:TextTable.Instance}}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,0">
+              <CheckBox x:Name="CursorBox" Content="{Binding [CaptureCursor], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,14"/>
+              <CheckBox x:Name="HighlightClicksBox" Content="{Binding [HighlightClicks], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,14"/>
+              <CheckBox x:Name="TemporaryMarkerBox" Content="{Binding [TemporaryMarker], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,6"/>
+              <TextBlock Text="{Binding [TemporaryMarkerHint], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" FontSize="12" Margin="22,0,0,16"/>
+              <CheckBox x:Name="SmoothCursorBox" Content="{Binding [SmoothCursor], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,16" ToolTip="{Binding [SmoothCursorHint], Source={x:Static local:TextTable.Instance}}"/>
+              <Grid IsEnabled="{Binding IsChecked, ElementName=SmoothCursorBox}">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <TextBlock Text="{Binding [CursorMotion], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Grid.Column="1" Text="{Binding [CursorSpeed], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}" Margin="8,0,0,6"/>
+                <ComboBox x:Name="CursorMotionBox" Grid.Row="1" Margin="0,0,8,0"/>
+                <ComboBox x:Name="CursorSpeedBox" Grid.Row="1" Grid.Column="1" Margin="8,0,0,0"/>
+              </Grid>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <TabItem x:Name="GeneralTab" Header="{Binding [GeneralTab], Source={x:Static local:TextTable.Instance}}">
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,0">
+              <TextBlock Text="{Binding [Language], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+              <ComboBox x:Name="LanguageBox" Margin="0,0,0,12" SelectionChanged="LanguageBox_SelectionChanged"/>
+              <TextBlock Text="{Binding [Folder], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+              <DockPanel Margin="0,0,0,14">
+                <Button x:Name="BrowseButton" Content="{Binding [Browse], Source={x:Static local:TextTable.Instance}}" Width="100" Margin="8,0,0,0" DockPanel.Dock="Right" Click="Browse_Click"/>
+                <TextBox x:Name="FolderBox"/>
+              </DockPanel>
+              <CheckBox x:Name="MinimizeBox" Content="{Binding [MinimizeOnRecord], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,16"/>
+              <TextBlock Text="{Binding [Hotkeys], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <TextBlock Text="{Binding [StartStop], Source={x:Static local:TextTable.Instance}}" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/>
+                <TextBox x:Name="StartHotkeyBox" Grid.Column="1" Margin="0,0,0,6"/>
+                <TextBlock Grid.Row="1" Text="{Binding [Pause], Source={x:Static local:TextTable.Instance}}" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/>
+                <TextBox x:Name="PauseHotkeyBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,6"/>
+                <TextBlock Grid.Row="2" Text="{Binding [Screenshot], Source={x:Static local:TextTable.Instance}}" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/>
+                <TextBox x:Name="ShotHotkeyBox" Grid.Row="2" Grid.Column="1"/>
+              </Grid>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+      </TabControl>
+
+      <StackPanel Grid.Row="2" Margin="0,14,0,0">
+        <TextBlock x:Name="ErrorText" Foreground="#FFE5484D" TextWrapping="Wrap" Margin="0,0,0,8"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Content="{Binding [Cancel], Source={x:Static local:TextTable.Instance}}" Width="110" Height="34" Margin="0,0,8,0" Click="Cancel_Click" Background="{StaticResource CardBrush}" BorderThickness="0"/>
+          <Button x:Name="SaveButton" Content="{Binding [Save], Source={x:Static local:TextTable.Instance}}" Width="120" Height="34" Click="Save_Click" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0"/>
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>

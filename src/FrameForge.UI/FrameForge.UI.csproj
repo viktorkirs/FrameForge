@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <RootNamespace>FrameForge.UI</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>FrameForge</AssemblyName>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ApplicationTitle>FrameForge Recorder</ApplicationTitle>
+    <ApplicationIcon>Assets\frameforge.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\frameforge-logo.png" />
+    <None Update="NAudio-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FrameForge.Core\FrameForge.Core.csproj" />
+    <ProjectReference Include="..\FrameForge.Diagnostics\FrameForge.Diagnostics.csproj" />
+    <ProjectReference Include="..\FrameForge.Capture\FrameForge.Capture.csproj" />
+    <ProjectReference Include="..\FrameForge.Encoding\FrameForge.Encoding.csproj" />
+  </ItemGroup>
+</Project>

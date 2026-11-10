@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <RootNamespace>FrameForge.Capture</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FrameForge.Core\FrameForge.Core.csproj" />
+    <ProjectReference Include="..\FrameForge.Diagnostics\FrameForge.Diagnostics.csproj" />
+    <ProjectReference Include="..\FrameForge.Encoding\FrameForge.Encoding.csproj" />
+  </ItemGroup>
+</Project>
