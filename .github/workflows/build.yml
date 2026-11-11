@@ -33,6 +33,13 @@ jobs:
       - name: Build self-contained installer
         shell: pwsh
         run: ./installer/Build-Installer.ps1
+      - name: Check SignPath preparation without signing
+        shell: pwsh
+        run: |
+          ./installer/Build-Installer.ps1 -Mode PrepareSignPath
+          $state = Get-Content artifacts/signpath/build.json -Raw | ConvertFrom-Json
+          $files = @(Get-ChildItem artifacts/signpath/unsigned -File -Recurse)
+          if ($files.Count -ne 7 -or -not $state.Version) { throw 'Incomplete SignPath inputs.' }
       - name: Upload installer and test report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
