@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters><parameter name="version" required="true" /></parameters>
+  <zip-file>
+    <pe-file path="FrameForge-Setup-${version}-x64.exe" product-name="FrameForge Recorder"
+             product-version="${version}" file-version="${version}.0" company-name="Victor Kirsanov">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+    <parameter name="uninstaller-file-version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file-set product-name="FrameForge Recorder" product-version="${version}"
+                 file-version="${version}.0" company-name="Victor Kirsanov">
+      <include path="app/FrameForge.exe" />
+      <include path="app/FrameForge.dll" />
+      <include path="app/FrameForge.Core.dll" />
+      <include path="app/FrameForge.Capture.dll" />
+      <include path="app/FrameForge.Encoding.dll" />
+      <include path="app/FrameForge.Diagnostics.dll" />
+      <for-each><authenticode-sign /></for-each>
+    </pe-file-set>
+    <!-- Inno Setup generates this PE from FrameForge.iss. Its internal file
+         version belongs to the pinned compiler; its product version is ours. -->
+    <pe-file path="uninstaller/FrameForge-Uninstaller.exe" product-name="FrameForge Recorder"
+             product-version="${version}" file-version="${uninstaller-file-version}" company-name="Victor Kirsanov">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

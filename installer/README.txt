@@ -35,3 +35,11 @@ and uninstaller. Every signature is verified. Missing signing inputs fail the bu
 it never silently falls back to an unsigned result when -Sign was requested.
 No certificate, private key or password belongs in the repository. The signing
 path must be exercised with the publisher's real certificate before signed release.
+
+SignPath Foundation (free open-source program, approval required):
+  pwsh -File installer\Build-Installer.ps1 -Mode PrepareSignPath
+
+This prepares the application and an external Inno Setup uninstaller for the
+separate GitHub Actions workflow. The prepared files are unsigned. See
+signing/README.md and CODE_SIGNING_POLICY.md for onboarding, manual approvals,
+artifact configurations and verification. Ordinary installer builds are unchanged.

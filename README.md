@@ -11,6 +11,9 @@ Download `FrameForge-Setup-<version>-x64.exe` from [Releases](https://github.com
 The installer includes the .NET runtime, installs for the current user, adds a Start menu shortcut,
 and offers an optional desktop shortcut. Uninstalling preserves your settings and recordings.
 
+[Code signing policy](CODE_SIGNING_POLICY.md) · [Privacy policy](PRIVACY.md).
+SignPath Foundation signing is being prepared; currently published installers are unsigned.
+
 The installer requires x64-compatible Windows 10 build 19041 or later, or Windows 11.
 Screen capture and hardware encoding depend on the available graphics drivers and hardware.
 
@@ -47,6 +50,8 @@ pwsh -File installer/Build-Installer.ps1
 The installer and its SHA256 checksum are written to `dist/`.
 [Installer documentation](installer/README.txt) includes optional Authenticode signing.
 Signing requires your own valid code-signing certificate; ordinary builds are unsigned.
+The separate [SignPath workflow](.github/workflows/signpath.yml) supports the free open-source
+signing program after approval. See [setup instructions](signing/README.md).
 
 ## Verification
 

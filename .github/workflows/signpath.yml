@@ -1,0 +1,135 @@
+name: SignPath release preparation
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_signing:
+        description: 'Request production signatures (requires SignPath approval and configuration)'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: signpath-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  signing:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - name: Check signing configuration
+        if: inputs.request_signing
+        shell: pwsh
+        env:
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          if ('${{ github.repository }}' -ne 'viktorkirs/FrameForge' -or '${{ github.ref }}' -ne 'refs/heads/main') {
+            throw 'Production signing is allowed only from viktorkirs/FrameForge main.'
+          }
+          foreach ($name in @('SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PROJECT_SLUG', 'SIGNPATH_API_TOKEN')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing signing configuration: $name" }
+          }
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and check
+        shell: pwsh
+        run: |
+          dotnet build FrameForge.slnx -c Release
+          if ($LASTEXITCODE) { throw 'Build failed.' }
+          dotnet run --project tests/FrameForge.RegressionTests -c Release --no-build -- artifacts/ci --headless
+          if ($LASTEXITCODE) { throw 'Regression checks failed.' }
+      - name: Prepare application and external uninstaller
+        id: prepare
+        shell: pwsh
+        run: |
+          ./installer/Build-Installer.ps1 -Mode PrepareSignPath
+          $state = Get-Content artifacts/signpath/build.json -Raw | ConvertFrom-Json
+          $uninstaller = Get-Item artifacts/signpath/unsigned/uninstaller/FrameForge-Uninstaller.exe
+          "version=$($state.Version)" >> $env:GITHUB_OUTPUT
+          "uninstaller-file-version=$($uninstaller.VersionInfo.FileVersion.Trim())" >> $env:GITHUB_OUTPUT
+      - name: Upload unsigned inputs for origin verification
+        id: inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: FrameForge-signpath-inputs
+          path: artifacts/signpath/unsigned/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Request application and uninstaller signatures
+        if: inputs.request_signing
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: frameforge-inputs
+          github-artifact-id: ${{ steps.inputs.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: artifacts/signpath/signed-inputs
+          parameters: |
+            version: ${{ toJSON(steps.prepare.outputs.version) }}
+            uninstaller-file-version: ${{ toJSON(steps.prepare.outputs.uninstaller-file-version) }}
+      - name: Package verified signed files
+        if: inputs.request_signing
+        shell: pwsh
+        run: ./installer/Build-Installer.ps1 -Mode CompleteSignPath -SignedFilesDirectory artifacts/signpath/signed-inputs
+      - name: Upload installer for origin verification
+        if: inputs.request_signing
+        id: installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: FrameForge-signpath-installer-input
+          path: dist/FrameForge-Setup-*-x64.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Request installer signature
+        if: inputs.request_signing
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: frameforge-installer
+          github-artifact-id: ${{ steps.installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: artifacts/signpath/release
+          parameters: |
+            version: ${{ toJSON(steps.prepare.outputs.version) }}
+      - name: Verify final installer and calculate checksum
+        if: inputs.request_signing
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          $setup = "artifacts/signpath/release/FrameForge-Setup-$env:APP_VERSION-x64.exe"
+          ./installer/Test-SignPathSignature.ps1 -FilePath $setup -Version $env:APP_VERSION
+          $hash = Get-FileHash -LiteralPath $setup -Algorithm SHA256
+          "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($setup))" | Set-Content -LiteralPath "$setup.sha256" -Encoding utf8NoBOM
+      - name: Upload verified signed release
+        if: inputs.request_signing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: FrameForge-signed-windows-x64
+          path: artifacts/signpath/release/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preparation summary
+        if: ${{ !inputs.request_signing }}
+        shell: pwsh
+        run: |
+          'Preparation completed. Artifacts are UNSIGNED. No signing request was sent and no release was published.' >> $env:GITHUB_STEP_SUMMARY

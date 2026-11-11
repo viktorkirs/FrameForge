@@ -52,6 +52,10 @@ SignedUninstaller=yes
 SignedUninstallerDir={#RepoRoot}\artifacts\signed-uninstallers
 SignToolRunMinimized=yes
 #endif
+#ifdef ExternalSignBuild
+SignedUninstaller=yes
+SignedUninstallerDir={#ExternalUninstallerDir}
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
