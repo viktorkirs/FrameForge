@@ -12,6 +12,11 @@ No compiler installation or administrator access is needed.
 
 Output: dist\FrameForge-Setup-<version>-x64.exe and its .sha256 file.
 Version comes from Directory.Build.props. Keep the AppId stable across releases.
+Each push to main builds an installer in GitHub Actions. After successful checks,
+the publish job updates the permanent download link:
+  https://github.com/viktorkirs/FrameForge/releases/download/latest/FrameForge-Setup-x64.exe
+Each commit keeps its own Actions artifact for 14 days. An older concurrent build
+cannot replace the download for a newer main commit. Versioned releases are unchanged.
 The installer supports Russian, English and German and installs per user.
 It never force-closes the recorder. Settings and recordings are outside the payload
 and are not deleted by the uninstaller.

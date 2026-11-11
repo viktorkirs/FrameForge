@@ -7,7 +7,10 @@ Created by **Victor Kirsanov**. Licensed under [MIT](LICENSE).
 
 ## Download and install
 
-Download `FrameForge-Setup-<version>-x64.exe` from [Releases](https://github.com/viktorkirs/FrameForge/releases).
+[Download the latest installer](https://github.com/viktorkirs/FrameForge/releases/download/latest/FrameForge-Setup-x64.exe).
+This permanent link updates after the build and checks pass for each push to `main`.
+The rolling build's release notes identify the application version and source commit.
+Versioned releases are also available in [Releases](https://github.com/viktorkirs/FrameForge/releases).
 The installer includes the .NET runtime, installs for the current user, adds a Start menu shortcut,
 and offers an optional desktop shortcut. Uninstalling preserves your settings and recordings.
 

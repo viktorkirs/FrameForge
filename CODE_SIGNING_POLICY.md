@@ -47,7 +47,9 @@ timestamps are checked before packaging or exporting a signed release. Failure s
 build; it does not publish an unsigned substitute. Signed files must not be edited afterwards.
 
 Signed downloads must link to this policy. Ordinary development builds and preparation artifacts
-must be clearly identified as unsigned. Workflow artifacts are not automatically published as releases.
+must be clearly identified as unsigned. The Windows build workflow publishes its latest successful
+unsigned installer as a clearly labelled rolling build. The SignPath workflow's signed output
+still requires separate release review and publication.
 
 ## Privacy
 

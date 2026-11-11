@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-build-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-build-${{ github.event_name }}-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -50,3 +50,28 @@ jobs:
             dist/FrameForge-Setup-*-x64.exe
             dist/FrameForge-Setup-*-x64.exe.sha256
             artifacts/ci/regression-result.txt
+
+  publish-installer:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'viktorkirs/FrameForge'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: latest-installer-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: FrameForge-windows-x64
+          path: artifacts/installer-download
+      - name: Publish the latest verified installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_COMMIT: ${{ github.sha }}
+        run: ./installer/Publish-LatestInstaller.ps1 -ArtifactDirectory artifacts/installer-download/dist -CommitSha $env:BUILD_COMMIT
