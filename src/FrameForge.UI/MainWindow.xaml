@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
-        Icon="pack://application:,,,/Assets/frameforge-logo.png"
+        Icon="pack://application:,,,/FrameForge;component/Assets/frameforge-logo.png"
         Background="{StaticResource BgBrush}">
   <WindowChrome.WindowChrome>
     <!-- 6px resize edge + 46 covers the title row (1px border, 10px margin, 36px row) and stops above the preview. -->
@@ -82,52 +82,13 @@
                    RenderOptions.BitmapScalingMode="HighQuality"
                    AutomationProperties.Name="FrameForge logo">
             <Ellipse.Fill>
-              <ImageBrush ImageSource="pack://application:,,,/Assets/frameforge-logo.png" Stretch="UniformToFill"/>
+              <ImageBrush ImageSource="pack://application:,,,/FrameForge;component/Assets/frameforge-logo.png" Stretch="UniformToFill"/>
             </Ellipse.Fill>
           </Ellipse>
           <TextBlock Text="FrameForge" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
           <TextBlock Text="Recorder" Margin="8,0,0,0" Foreground="{StaticResource MutedBrush}" FontSize="13" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-          <Button Content="EN" Margin="0,0,4,0" Command="{Binding UseEnglishCommand}">
-            <Button.Style>
-              <Style TargetType="Button" BasedOn="{StaticResource LangButton}">
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding IsEnglish}" Value="True">
-                    <Setter Property="Foreground" Value="White"/>
-                    <Setter Property="FontWeight" Value="SemiBold"/>
-                    <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-                  </DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </Button.Style>
-          </Button>
-          <Button Content="DE" Margin="0,0,4,0" Command="{Binding UseGermanCommand}">
-            <Button.Style>
-              <Style TargetType="Button" BasedOn="{StaticResource LangButton}">
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding IsGerman}" Value="True">
-                    <Setter Property="Foreground" Value="White"/>
-                    <Setter Property="FontWeight" Value="SemiBold"/>
-                    <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-                  </DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </Button.Style>
-          </Button>
-          <Button Content="RU" Margin="0,0,8,0" Command="{Binding UseRussianCommand}">
-            <Button.Style>
-              <Style TargetType="Button" BasedOn="{StaticResource LangButton}">
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding IsRussian}" Value="True">
-                    <Setter Property="Foreground" Value="White"/>
-                    <Setter Property="FontWeight" Value="SemiBold"/>
-                    <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-                  </DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </Button.Style>
-          </Button>
           <Button Style="{StaticResource IconButton}" Command="{Binding AboutCommand}"
                   ToolTip="{Binding [About], Source={x:Static local:TextTable.Instance}}"
                   AutomationProperties.Name="{Binding [About], Source={x:Static local:TextTable.Instance}}">
@@ -139,9 +100,7 @@
           <Button Style="{StaticResource IconButton}" Click="Minimize_Click" ToolTip="{Binding [Minimize], Source={x:Static local:TextTable.Instance}}">
             <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="12"/>
           </Button>
-          <Button Style="{StaticResource CloseButton}" Click="Close_Click" ToolTip="{Binding [Close], Source={x:Static local:TextTable.Instance}}">
-            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="12"/>
-          </Button>
+          <Button x:Name="CloseWindowButton" Style="{StaticResource CloseButton}" Click="Close_Click"/>
         </StackPanel>
       </Grid>
 

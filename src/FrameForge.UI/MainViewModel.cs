@@ -58,9 +58,6 @@ public sealed class MainViewModel : ObservableObject
         SettingsCommand = new RelayCommand(EditSettings, () => !IsRecording && !_busy);
         AboutCommand = new RelayCommand(() => new AboutWindow { Owner = Application.Current.MainWindow }.ShowDialog());
         CycleMonitorCommand = new RelayCommand(CycleMonitor, () => !IsRecording && !_busy);
-        UseEnglishCommand = new RelayCommand(() => ApplyLanguage(AppLanguage.English));
-        UseGermanCommand = new RelayCommand(() => ApplyLanguage(AppLanguage.German));
-        UseRussianCommand = new RelayCommand(() => ApplyLanguage(AppLanguage.Russian));
         ScreenModeCommand = new RelayCommand(SelectScreen, () => !IsRecording && !_busy);
         WindowModeCommand = new RelayCommand(SelectWindow, () => !IsRecording && !_busy);
         RegionModeCommand = new RelayCommand(SelectRegion, () => !IsRecording && !_busy);
@@ -120,13 +117,6 @@ public sealed class MainViewModel : ObservableObject
         _ => Loc.Get("TargetScreen")
     };
     string WindowLabel => string.IsNullOrWhiteSpace(_windowProcess) ? _windowTitle : $"{_windowTitle} — {_windowProcess}";
-    public RelayCommand UseEnglishCommand { get; }
-    public RelayCommand UseGermanCommand { get; }
-    public RelayCommand UseRussianCommand { get; }
-    public bool IsEnglish => Loc.Language == AppLanguage.English;
-    public bool IsGerman => Loc.Language == AppLanguage.German;
-    public bool IsRussian => Loc.Language == AppLanguage.Russian;
-
     public ImageSource? PreviewImage { get; private set; }
     public string MonitorLabel => _monitor?.Label ?? Loc.Get("MonitorMissing");
     public string ResolutionText => IsRecording && _engine.Snapshot.Width > 0
@@ -539,15 +529,6 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 
-    void ApplyLanguage(AppLanguage language)
-    {
-        if (_settings.Language == language && Loc.Language == language)
-            return;
-        _settings.Language = language;
-        SettingsStore.Save(_settings);
-        Loc.Set(language);
-    }
-
     void OnLanguageChanged()
     {
         if (_hintKey != null)
@@ -555,9 +536,6 @@ public sealed class MainViewModel : ObservableObject
         RefreshLabels();
         OnPropertyChanged(nameof(RecordText));
         OnPropertyChanged(nameof(PauseText));
-        OnPropertyChanged(nameof(IsEnglish));
-        OnPropertyChanged(nameof(IsGerman));
-        OnPropertyChanged(nameof(IsRussian));
         RefreshTarget();
         RefreshDiskText();
         SyncRegionBorder();

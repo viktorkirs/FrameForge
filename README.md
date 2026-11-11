@@ -29,6 +29,8 @@ Screen capture and hardware encoding depend on the available graphics drivers an
   and release Alt to clear the drawing.
 - Russian, English and German interface.
 
+Choose the interface language on first launch. To change it later, open **Settings → General → Language**.
+
 When a captured window changes size, the full image is fitted into the recording's fixed canvas.
 Black bars preserve its aspect ratio; the MP4 resolution remains constant.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3
+
+- Use the same close button icon, size and hover appearance in the main window and settings.
+- Ask for Russian, English or German on first launch and remember the selection.
+- Keep language selection in Settings and remove the language buttons from the main window.
+
 ## 1.2.2
 
 - Recreate the capture frame pool and dependent resources when a recorded window changes size.

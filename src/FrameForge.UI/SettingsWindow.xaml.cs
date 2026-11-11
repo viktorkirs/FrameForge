@@ -29,14 +29,9 @@ public partial class SettingsWindow : Window
         _microphones = AudioDeviceCatalog.GetMicrophones();
         Loc.Changed += OnLanguageChanged;
 
-        LanguageBox.SelectedValuePath = nameof(Option.Value);
-        LanguageBox.DisplayMemberPath = nameof(Option.Label);
-        LanguageBox.ItemsSource = new[]
-        {
-            Option.Of(AppLanguage.English, "English"),
-            Option.Of(AppLanguage.German, "Deutsch"),
-            Option.Of(AppLanguage.Russian, "Русский")
-        };
+        LanguageBox.SelectedValuePath = nameof(LanguageChoice.Value);
+        LanguageBox.DisplayMemberPath = nameof(LanguageChoice.Label);
+        LanguageBox.ItemsSource = LanguageChoice.All;
         LanguageBox.SelectedValue = _settings.Language ?? Loc.Language;
 
         MonitorBox.DisplayMemberPath = nameof(MonitorInfo.Label);

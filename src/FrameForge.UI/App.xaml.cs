@@ -36,10 +36,17 @@ public partial class App : Application
         }
 
         AppSettings settings = SettingsStore.Load();
-        Loc.Set(settings.Language ?? Loc.FromCulture());
+        // The first-run dialog can close before the main window exists.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        if (!LanguageWindow.ChooseIfNeeded(settings))
+        {
+            Shutdown();
+            return;
+        }
         var window = new MainWindow();
         MainWindow = window;
         window.Show();
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
         base.OnStartup(e);
     }
 

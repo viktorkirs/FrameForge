@@ -67,7 +67,7 @@
       <Border x:Name="SettingsTitleBar" Background="Transparent" MouseLeftButtonDown="Title_MouseLeftButtonDown" Margin="0,0,0,18"
               AutomationProperties.AutomationId="SettingsTitleBar" AutomationProperties.Name="SettingsTitleBar">
         <DockPanel>
-          <Button Content="×" Width="30" Height="30" Padding="0" DockPanel.Dock="Right" Click="Cancel_Click" ToolTip="{Binding [Close], Source={x:Static local:TextTable.Instance}}"/>
+          <Button x:Name="CloseWindowButton" Style="{StaticResource CloseButton}" DockPanel.Dock="Right" Click="Cancel_Click"/>
           <TextBlock Text="{Binding [SettingsTitle], Source={x:Static local:TextTable.Instance}}" FontSize="21" FontWeight="SemiBold" VerticalAlignment="Center"/>
         </DockPanel>
       </Border>

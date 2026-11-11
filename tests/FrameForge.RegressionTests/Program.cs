@@ -50,6 +50,15 @@ internal static partial class Program
         try
         {
             if (args.Contains("--long-recording")) return LongRecording(args);
+            if (args.Contains("--preferences"))
+            {
+                RunPreferencesTests();
+                string preferencesReport = $"PASS: {_passed} preferences checks";
+                Console.WriteLine(preferencesReport);
+                File.WriteAllText(Path.Combine(_output, "regression-result.txt"), preferencesReport + Environment.NewLine);
+                return 0;
+            }
+            RunPreferencesTests();
             Test("hotkeys reject invalid keys and empty segments", () =>
             {
                 foreach (string text in new[] { "Ctrl+Ж", "Ctrl+١", "Ctrl++F9", "+F9", "F9+", "Ctrl+", "F25", "A+B" })

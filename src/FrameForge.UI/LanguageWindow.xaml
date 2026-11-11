@@ -1,0 +1,30 @@
+<Window x:Class="FrameForge.UI.LanguageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:FrameForge.UI"
+        Title="FrameForge Recorder — Language / Sprache / Язык"
+        Width="480" SizeToContent="Height" ResizeMode="NoResize" WindowStyle="None"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource BgBrush}"
+        Icon="pack://application:,,,/FrameForge;component/Assets/frameforge-logo.png">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+  <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="24">
+    <StackPanel>
+      <DockPanel Background="Transparent" MouseLeftButtonDown="Title_MouseLeftButtonDown" Margin="0,0,0,24">
+        <Button x:Name="CloseWindowButton" Style="{StaticResource CloseButton}" DockPanel.Dock="Right" IsCancel="True" Click="Cancel_Click"/>
+        <TextBlock Text="FrameForge Recorder" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+      </DockPanel>
+      <TextBlock Text="{Binding [ChooseLanguage], Source={x:Static local:TextTable.Instance}}"
+                 FontSize="21" FontWeight="SemiBold" Margin="0,0,0,18"/>
+      <TextBlock Text="Language / Sprache / Язык" Style="{StaticResource FieldLabel}"/>
+      <ComboBox x:Name="LanguageBox" DisplayMemberPath="Label" SelectedValuePath="Value"
+                SelectionChanged="LanguageBox_SelectionChanged" AutomationProperties.Name="Language / Sprache / Язык"/>
+      <TextBlock Text="{Binding [LanguageSettingsHint], Source={x:Static local:TextTable.Instance}}"
+                 Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,14,0,24"/>
+      <Button x:Name="ContinueButton" Content="{Binding [Continue], Source={x:Static local:TextTable.Instance}}"
+              IsDefault="True" Click="Continue_Click" HorizontalAlignment="Right" MinWidth="130" Height="36"
+              Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0"/>
+    </StackPanel>
+  </Border>
+</Window>
