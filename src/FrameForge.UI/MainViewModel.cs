@@ -357,6 +357,7 @@ public sealed class MainViewModel : ObservableObject
             SavePng(bitmap, path);
             Clipboard.SetImage(bitmap);
             Show("ScreenshotSaved", Path.GetFileName(path));
+            ShutterSound.Play();
         }
         catch (Exception ex)
         {

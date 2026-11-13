@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.5
+
+- Play a short camera shutter sound after successfully saving and copying a screenshot,
+  including screenshots taken with the global hotkey. Playback does not block the interface.
+
 ## 1.2.4
 
 - Capture the selected region or application window when taking a screenshot outside recording.
