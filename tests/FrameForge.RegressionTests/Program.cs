@@ -50,6 +50,14 @@ internal static partial class Program
         try
         {
             if (args.Contains("--long-recording")) return LongRecording(args);
+            if (args.Contains("--screenshots"))
+            {
+                RunScreenshotTests();
+                string screenshotReport = $"PASS: {_passed} screenshot checks";
+                Console.WriteLine(screenshotReport);
+                File.WriteAllText(Path.Combine(_output, "regression-result.txt"), screenshotReport + Environment.NewLine);
+                return 0;
+            }
             if (args.Contains("--preferences"))
             {
                 RunPreferencesTests();

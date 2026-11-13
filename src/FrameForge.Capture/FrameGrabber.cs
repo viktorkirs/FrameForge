@@ -7,10 +7,15 @@ namespace FrameForge.Capture;
 
 public static class FrameGrabber
 {
-    public static BgraFrame Capture(MonitorInfo monitor, int maxEdge = 0)
+    public static BgraFrame Capture(MonitorInfo monitor, int maxEdge = 0) =>
+        Capture(new CaptureRequest { Monitor = monitor }, maxEdge);
+
+    public static BgraFrame Capture(CaptureRequest request, int maxEdge = 0)
     {
-        using GraphicsDevice device = GraphicsDevice.CreateForMonitor(new MonitorHandle(monitor.Handle));
-        using WgcCapture capture = WgcCapture.Start(device, monitor, captureCursor: true, fps: 30);
+        using GraphicsDevice device = GraphicsDevice.CreateForMonitor(new MonitorHandle(request.Monitor.Handle));
+        using WgcCapture capture = request.Window != 0
+            ? WgcCapture.StartWindow(device, request.Window, captureCursor: true, fps: 30)
+            : WgcCapture.Start(device, request.Monitor, captureCursor: true, fps: 30);
         if (!capture.WaitForFrame(TimeSpan.FromSeconds(2)))
             throw new TimeoutException(Loc.Get("GrabFailed"));
 
@@ -27,7 +32,17 @@ public static class FrameGrabber
         try
         {
             capture.CopyLatest(ref snapshot);
-            return ReadTexture(device, snapshot!, (int)snapshot!.Description.Width, (int)snapshot.Description.Height, maxEdge);
+            int width = (int)snapshot!.Description.Width;
+            int height = (int)snapshot.Description.Height;
+            if (request.Window == 0 && request.HasCrop)
+            {
+                if (request.CropX < 0 || request.CropY < 0 ||
+                    (long)request.CropX + request.CropWidth > width ||
+                    (long)request.CropY + request.CropHeight > height)
+                    throw new InvalidOperationException(Loc.Get("RegionOffScreen"));
+                return ReadBox(device, snapshot, request.CropX, request.CropY, request.CropWidth, request.CropHeight, maxEdge);
+            }
+            return ReadTexture(device, snapshot, width, height, maxEdge);
         }
         finally { snapshot?.Dispose(); }
     }

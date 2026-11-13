@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.4
+
+- Capture the selected region or application window when taking a screenshot outside recording.
+  Use the same target for the recording-frame fallback, saved PNG and clipboard image.
+- Report missing or unavailable screenshot targets instead of capturing the full monitor.
+
 ## 1.2.3
 
 - Use the same close button icon, size and hover appearance in the main window and settings.

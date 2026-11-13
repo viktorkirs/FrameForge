@@ -7,6 +7,8 @@ Requires Windows, .NET 10 SDK, an interactive desktop and a connected monitor.
 The --capture checks additionally require a working hardware H.264 encoder.
 Without --capture, the shutdown check still makes a short recording with automatic encoder selection.
 Use --headless for CI checks that require no WPF desktop, GPU capture or audio device.
+Use --screenshots for monitor/region/window screenshots, moved selections, recording/pause,
+PNG and clipboard pixels, occluded windows, and invalid targets without full-screen fallback.
 Use --preferences to check first-run language selection, persistence and settings save/cancel
 without recording. Screenshots of all three languages and the updated windows are saved.
 

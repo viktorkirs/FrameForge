@@ -340,9 +340,9 @@ public sealed class MainViewModel : ObservableObject
     {
         if (_busy || _finishing)
             return;
-        if (_monitor == null)
+        if (!TryCreateRequest(out CaptureRequest request, out string errorKey))
         {
-            Show("NoMonitor");
+            Show(errorKey);
             return;
         }
 
@@ -350,8 +350,8 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             BgraFrame frame = _engine.IsActive
-                ? _engine.CopyCurrentFrame() ?? FrameGrabber.Capture(_monitor)
-                : FrameGrabber.Capture(_monitor);
+                ? _engine.CopyCurrentFrame() ?? FrameGrabber.Capture(request)
+                : FrameGrabber.Capture(request);
             string path = AppPaths.CreateScreenshotPath(AppPaths.ResolveOutputDirectory(_settings.OutputDirectory));
             BitmapSource bitmap = CreateBitmap(frame);
             SavePng(bitmap, path);
