@@ -154,6 +154,7 @@
                 <TextBox x:Name="FolderBox"/>
               </DockPanel>
               <CheckBox x:Name="MinimizeBox" Content="{Binding [MinimizeOnRecord], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,16"/>
+              <CheckBox x:Name="CheckUpdatesBox" Content="{Binding [CheckUpdatesOnStartup], Source={x:Static local:TextTable.Instance}}" Margin="0,0,0,16"/>
               <TextBlock Text="{Binding [Hotkeys], Source={x:Static local:TextTable.Instance}}" Style="{StaticResource FieldLabel}"/>
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>

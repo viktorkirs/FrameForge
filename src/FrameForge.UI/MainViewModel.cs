@@ -44,6 +44,7 @@ public sealed class MainViewModel : ObservableObject
     string _diskEstimate = "";
     bool _diskEstimateLow;
     string _machineWarning = "";
+    string? _lastVideoFile;
 
     public MainViewModel()
     {
@@ -56,12 +57,13 @@ public sealed class MainViewModel : ObservableObject
         PauseCommand = new RelayCommand(TogglePause, () => IsRecording && !_busy && !_finishing);
         ScreenshotCommand = new RelayCommand(TakeScreenshot, () => !_busy && !_finishing);
         SettingsCommand = new RelayCommand(EditSettings, () => !IsRecording && !_busy);
-        AboutCommand = new RelayCommand(() => new AboutWindow { Owner = Application.Current.MainWindow }.ShowDialog());
+        AboutCommand = new RelayCommand(() => new AboutWindow(Updates) { Owner = Application.Current.MainWindow }.ShowDialog());
         CycleMonitorCommand = new RelayCommand(CycleMonitor, () => !IsRecording && !_busy);
         ScreenModeCommand = new RelayCommand(SelectScreen, () => !IsRecording && !_busy);
         WindowModeCommand = new RelayCommand(SelectWindow, () => !IsRecording && !_busy);
         RegionModeCommand = new RelayCommand(SelectRegion, () => !IsRecording && !_busy);
         OpenFolderCommand = new RelayCommand(OpenSavedFolder, () => CanOpenFolder);
+        EditVideoCommand = new RelayCommand(EditVideo, () => !IsRecording && !_busy && !_finishing);
         _regionX = _settings.RegionX;
         _regionY = _settings.RegionY;
         _regionWidth = _settings.RegionWidth;
@@ -103,6 +105,8 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand WindowModeCommand { get; }
     public RelayCommand RegionModeCommand { get; }
     public RelayCommand OpenFolderCommand { get; }
+    public RelayCommand EditVideoCommand { get; }
+    public AppUpdateViewModel Updates { get; } = new();
     public string ScreenTag => _settings.Mode == CaptureMode.Monitor ? "Selected" : "";
     public string WindowTag => _settings.Mode == CaptureMode.Window ? "Selected" : "";
     public string RegionTag => _settings.Mode == CaptureMode.Region ? "Selected" : "";
@@ -218,6 +222,7 @@ public sealed class MainViewModel : ObservableObject
     public async Task ShutdownAsync()
     {
         _shuttingDown = true;
+        Updates.Dispose();
         _markerController.Dispose();
         SetBusy(true);
         _regionBorder.Dispose();
@@ -377,6 +382,7 @@ public sealed class MainViewModel : ObservableObject
             return;
 
         _settings = edited;
+        _ = Updates.StartAsync(_settings.CheckUpdatesOnStartup);
         ConfigureMarker();
         _settings.Normalize();
         SettingsStore.Save(_settings);
@@ -941,6 +947,7 @@ public sealed class MainViewModel : ObservableObject
     {
         string full = Path.GetFullPath(path);
         _savedFile = File.Exists(full) ? full : null;
+        _lastVideoFile = _savedFile;
         Show("Saved", Path.GetFileName(full));
         OnPropertyChanged(nameof(CanOpenFolder));
         OpenFolderCommand.RaiseCanExecuteChanged();
@@ -970,6 +977,17 @@ public sealed class MainViewModel : ObservableObject
             Arguments = "/select,\"" + path + "\"",
             UseShellExecute = true
         });
+    }
+
+    void EditVideo()
+    {
+        SetBusy(true);
+        try
+        {
+            string? path = _lastVideoFile != null && File.Exists(_lastVideoFile) ? _lastVideoFile : null;
+            new VideoEditorWindow(path) { Owner = Application.Current.MainWindow }.ShowDialog();
+        }
+        finally { SetBusy(false); }
     }
 
     void NotifyRecording()
@@ -1005,6 +1023,7 @@ public sealed class MainViewModel : ObservableObject
         PauseCommand.RaiseCanExecuteChanged();
         ScreenshotCommand.RaiseCanExecuteChanged();
         SettingsCommand.RaiseCanExecuteChanged();
+        EditVideoCommand.RaiseCanExecuteChanged();
         CycleMonitorCommand.RaiseCanExecuteChanged();
         ScreenModeCommand.RaiseCanExecuteChanged();
         WindowModeCommand.RaiseCanExecuteChanged();

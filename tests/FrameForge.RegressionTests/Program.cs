@@ -32,6 +32,8 @@ internal static partial class Program
             {
                 RunAudioTimelineTests();
                 RunAuditCoreTests();
+                RunVideoEditTimelineTests();
+                RunUpdateCoreTests();
                 File.WriteAllText(Path.Combine(_output, "regression-result.txt"), $"PASS: {_passed} headless checks");
                 Console.WriteLine($"PASS: {_passed} headless checks");
                 return 0;
@@ -49,6 +51,28 @@ internal static partial class Program
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
         try
         {
+            if (args.Contains("--updates"))
+            {
+                RunUpdateUiTests();
+                string updateReport = $"PASS: {_passed} update checks";
+                Console.WriteLine(updateReport);
+                File.WriteAllText(Path.Combine(_output, "regression-result.txt"), updateReport + Environment.NewLine);
+                return 0;
+            }
+            if (args.Contains("--editor-preview"))
+            {
+                Loc.Set(AppLanguage.Russian);
+                new VideoEditorWindow(Path.Combine(_output, "editor-source.mp4")).ShowDialog();
+                return 0;
+            }
+            if (args.Contains("--editor"))
+            {
+                RunVideoEditorTests();
+                string editorReport = $"PASS: {_passed} video editor checks";
+                Console.WriteLine(editorReport);
+                File.WriteAllText(Path.Combine(_output, "regression-result.txt"), editorReport + Environment.NewLine);
+                return 0;
+            }
             if (args.Contains("--long-recording")) return LongRecording(args);
             if (args.Contains("--screenshots"))
             {

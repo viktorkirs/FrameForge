@@ -25,6 +25,7 @@ Screen capture and hardware encoding depend on the available graphics drivers an
 - Record a monitor, an application window, or a selected screen region to H.264 MP4.
 - Capture system audio and microphone audio independently, with device selection and circular level meters.
 - Pause and resume, take PNG screenshots, and configure global keyboard shortcuts.
+- Edit recordings with a preview, audio waveform, splitting, trimming and reordering of linked video/audio clips.
 - Move a selected region and edit its size before recording starts.
 - Find windows using live thumbnails and search.
 - Smooth the recorded cursor with acceleration, braking, arc and spiral paths.
@@ -33,6 +34,16 @@ Screen capture and hardware encoding depend on the available graphics drivers an
 - Russian, English and German interface.
 
 Choose the interface language on first launch. To change it later, open **Settings → General → Language**.
+
+The program checks GitHub for a newer installer on startup and offers a download when one is available.
+Use **About → Check for updates** to check manually, or disable startup checks in **Settings → General**.
+Downloads open in your browser; installation remains manual.
+
+After stopping a recording, click **Edit video**. The pencil in the title bar also opens the editor for
+an existing MP4. Click the ruler to seek, use **Split** (`Ctrl+B`), drag blocks to reorder them and drag
+their edges to trim. `Delete` removes the selected block, `Ctrl+Z` / `Ctrl+Y` undo and redo, and Space
+plays or pauses. The source in/out fields accept precise times. **Export MP4** saves a separate file
+and preserves the original. Video and audio stay linked, with gaps closed automatically.
 
 When a captured window changes size, the full image is fitted into the recording's fixed canvas.
 Black bars preserve its aspect ratio; the MP4 resolution remains constant.
@@ -71,6 +82,12 @@ On an interactive Windows desktop with a hardware H.264 encoder, output device a
 ```powershell
 dotnet run --project tests/FrameForge.RegressionTests -c Release -- artifacts/verification --capture --audio
 pwsh -File installer/Test-Installer.ps1
+```
+
+Editor checks use synthetic video/audio and do not record the desktop or microphone:
+
+```powershell
+dotnet run --project tests/FrameForge.RegressionTests -c Release -- artifacts/verification/editor --editor
 ```
 
 Real-time endurance recording (default: one hour, test window and system audio, microphone off):

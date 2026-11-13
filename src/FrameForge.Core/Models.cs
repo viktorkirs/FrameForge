@@ -89,6 +89,7 @@ public sealed class AppSettings
     public string? MicrophoneDeviceId { get; set; }
     public string? OutputDirectory { get; set; }
     public bool MinimizeOnRecord { get; set; }
+    public bool CheckUpdatesOnStartup { get; set; } = true;
     public string StartStopHotkey { get; set; } = "Ctrl+Shift+F9";
     public string PauseHotkey { get; set; } = "Ctrl+Shift+F10";
     public string ScreenshotHotkey { get; set; } = "Ctrl+Shift+F11";
@@ -120,6 +121,7 @@ public sealed class AppSettings
         MicrophoneDeviceId = MicrophoneDeviceId,
         OutputDirectory = OutputDirectory,
         MinimizeOnRecord = MinimizeOnRecord,
+        CheckUpdatesOnStartup = CheckUpdatesOnStartup,
         StartStopHotkey = StartStopHotkey,
         PauseHotkey = PauseHotkey,
         ScreenshotHotkey = ScreenshotHotkey,

@@ -22,6 +22,15 @@
                    AutomationProperties.AutomationId="ManufacturerName"/>
       </StackPanel>
     </Border>
+    <StackPanel Margin="0,18,0,0">
+      <Button x:Name="CheckUpdatesButton" Content="{Binding [CheckUpdates], Source={x:Static local:TextTable.Instance}}"
+              Command="{Binding CheckCommand}" HorizontalAlignment="Left" Padding="12,8" Cursor="Hand"
+              Background="{StaticResource CardBrush}" Foreground="{StaticResource TextBrush}" BorderThickness="0"/>
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,10,0,0" Foreground="{StaticResource MutedBrush}"/>
+      <Button Content="{Binding [UpdateDownload], Source={x:Static local:TextTable.Instance}}" Command="{Binding DownloadCommand}"
+              Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVis}}" HorizontalAlignment="Left" Margin="0,10,0,0"
+              Padding="12,8" Cursor="Hand" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0"/>
+    </StackPanel>
     <Button Content="{Binding [Close], Source={x:Static local:TextTable.Instance}}"
             Width="110" Height="34" Margin="0,24,0,0" HorizontalAlignment="Right"
             IsCancel="True" IsDefault="True" Click="Close_Click"

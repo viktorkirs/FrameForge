@@ -17,6 +17,9 @@ the publish job updates the permanent download link:
   https://github.com/viktorkirs/FrameForge/releases/download/latest/FrameForge-Setup-x64.exe
 Each commit keeps its own Actions artifact for 14 days. An older concurrent build
 cannot replace the download for a newer main commit. Versioned releases are unchanged.
+After verifying the uploaded installer and checksum, publication also uploads and verifies
+FrameForge-update.json with its version, download URL, checksum, size and source commit.
+FrameForge 1.3.0 and newer use this manifest for startup and manual update checks.
 The installer supports Russian, English and German and installs per user.
 It never force-closes the recorder. Settings and recordings are outside the payload
 and are not deleted by the uninstaller.

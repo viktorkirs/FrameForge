@@ -63,6 +63,7 @@ public partial class SettingsWindow : Window
         SystemAudioBox.IsChecked = _settings.SystemAudio;
         MicrophoneBox.IsChecked = _settings.Microphone;
         MinimizeBox.IsChecked = _settings.MinimizeOnRecord;
+        CheckUpdatesBox.IsChecked = _settings.CheckUpdatesOnStartup;
         FolderBox.Text = string.IsNullOrWhiteSpace(_settings.OutputDirectory)
             ? AppPaths.DefaultOutputDirectory
             : _settings.OutputDirectory;
@@ -268,6 +269,7 @@ public partial class SettingsWindow : Window
         if (CursorSpeedBox.SelectedValue is int speed)
             _settings.CursorSmoothnessMilliseconds = speed;
         _settings.MinimizeOnRecord = MinimizeBox.IsChecked == true;
+        _settings.CheckUpdatesOnStartup = CheckUpdatesBox.IsChecked == true;
         _settings.OutputDirectory = FolderBox.Text.Trim();
         _settings.StartStopHotkey = StartHotkeyBox.Text.Trim();
         _settings.PauseHotkey = PauseHotkeyBox.Text.Trim();

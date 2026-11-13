@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.0
+
+- Add a recording editor with a seekable preview, linked video/audio lanes, source thumbnails,
+  waveform, splitting, ripple deletion, edge trimming, drag reordering and undo/redo.
+- Export the montage to a separate MP4 with precise cuts, progress and cancellation; preserve the
+  original recording and existing destination files if rendering fails or is canceled.
+- Open the latest recording from the saved-recording action or an existing MP4 from the title bar.
+- Highlight timeline blocks and enlarge trim handles on hover, with movement/resize cursors.
+- Decode paused previews independently of playback, including live edge previews, rapid seeks,
+  frame stepping after trimming and the exclusive end of a clip.
+- Check GitHub for new installers on startup and from About, show a download notice, and allow
+  automatic checks to be disabled in General settings. Publish a verified update manifest with each installer.
+
 ## 1.2.5
 
 - Play a short camera shutter sound after successfully saving and copying a screenshot,

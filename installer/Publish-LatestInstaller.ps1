@@ -49,6 +49,15 @@ $assetName = 'FrameForge-Setup-x64.exe'
 $alias = Join-Path $releaseDirectory $assetName
 Copy-Item -LiteralPath $setup.FullName -Destination $alias
 [IO.File]::WriteAllText("$alias.sha256", "$hash  $assetName`n")
+$manifestPath = Join-Path $releaseDirectory 'FrameForge-update.json'
+$manifest = [ordered]@{
+    version = $version
+    downloadUrl = "https://github.com/$repository/releases/download/latest/$assetName"
+    sha256 = $hash
+    size = $setup.Length
+    commit = $CommitSha
+} | ConvertTo-Json
+[IO.File]::WriteAllText($manifestPath, $manifest)
 $signatureText = if ($signature.Status -eq 'Valid') { 'Valid Authenticode signature.' } else {
     'This installer is unsigned. SignPath Foundation signing is awaiting approval; Windows may show a SmartScreen warning.'
 }
@@ -83,6 +92,15 @@ foreach ($file in @($alias, "$alias.sha256")) {
         $asset[0].size -ne (Get-Item -LiteralPath $file).Length -or $asset[0].digest -ne $expectedDigest) {
         throw "Release asset verification failed: $name"
     }
+}
+# Publish the version notice only after the installer and checksum have been verified.
+Invoke-Gh @('release', 'upload', 'latest', $manifestPath, '--repo', $repository, '--clobber') | Out-Host
+$manifestRelease = (Invoke-Gh @('api', "repos/$repository/releases/tags/latest")) | ConvertFrom-Json
+$manifestAsset = @($manifestRelease.assets | Where-Object name -eq 'FrameForge-update.json')
+$manifestDigest = 'sha256:' + (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($manifestAsset.Count -ne 1 -or $manifestAsset[0].state -ne 'uploaded' -or
+    $manifestAsset[0].size -ne (Get-Item -LiteralPath $manifestPath).Length -or $manifestAsset[0].digest -ne $manifestDigest) {
+    throw 'Update manifest verification failed.'
 }
 # Only this explicitly mutable rolling tag is moved; versioned release tags are untouched.
 Invoke-Gh @('api', '--method', 'PATCH', "repos/$repository/git/refs/tags/latest",

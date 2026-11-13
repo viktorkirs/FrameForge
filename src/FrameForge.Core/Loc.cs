@@ -9,7 +9,7 @@ public enum AppLanguage
     Russian = 2
 }
 
-public static class Loc
+public static partial class Loc
 {
     static readonly Dictionary<string, string> En = new()
     {

@@ -9,8 +9,8 @@ System audio, microphone audio, cursor effects and temporary annotations are con
 Video, audio and screenshots are written to the selected output location. Settings and local
 diagnostics are stored in the application's user-data folder (or the portable data folder).
 
-FrameForge does not upload this content, collect analytics, report crashes to a server, or perform
-automatic network update checks. It contains no advertising or account sign-in. Bundled capture,
+FrameForge does not upload this content, collect analytics, or report crashes to a server.
+It contains no advertising or account sign-in. Bundled capture,
 audio and encoding components process recording data locally.
 
 Files saved into a network share or a cloud-synchronized folder are subject to the user's chosen
@@ -18,6 +18,12 @@ storage provider and sync software. Removing the application preserves recording
 users can delete those files themselves.
 
 ## Website, downloads and code signing
+
+Starting with 1.3.0, FrameForge checks a small version manifest hosted in the GitHub release when
+the program starts. You can disable this in **Settings → General → Check for updates on startup**
+and check manually in **About**. GitHub receives a normal HTTPS request, including your IP address
+and the FrameForge version in its user agent. Recordings, screenshots, settings and logs are not sent.
+The download button opens the installer link in your browser; installation is started by the user.
 
 The source repository, issue tracker, downloads and CI are hosted on GitHub. Visiting these pages
 or posting an issue is subject to [GitHub's privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).

@@ -7,6 +7,15 @@ Requires Windows, .NET 10 SDK, an interactive desktop and a connected monitor.
 The --capture checks additionally require a working hardware H.264 encoder.
 Without --capture, the shutdown check still makes a short recording with automatic encoder selection.
 Use --headless for CI checks that require no WPF desktop, GPU capture or audio device.
+The headless checks include montage source-time mapping, trimming, reordering and undo/redo.
+Use --editor for synthetic linked video/audio montage export, silent MP4s, waveform decoding,
+export cancellation/source preservation, paused preview scrubbing and translated editor layouts.
+Editor checks also cover hover cursors, highlighted/enlarged handles, per-frame source mapping
+after trimming, rapid seek requests and the exclusive out point of a clip.
+These checks need Windows media codecs and WPF, but do not capture the desktop or microphone.
+After --editor, --editor-preview opens its synthetic recording for manual mouse/keyboard checks.
+Use --updates for update-notification UI, download actions and offline/cancellation checks using
+fake HTTP responses. Manifest parsing and HTTP checks also run under --headless, without network access.
 Use --screenshots for monitor/region/window screenshots, moved selections, recording/pause,
 PNG and clipboard pixels, occluded windows, and invalid targets without full-screen fallback.
 Use --preferences to check first-run language selection, persistence and settings save/cancel

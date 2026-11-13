@@ -24,7 +24,11 @@ public partial class MainWindow : Window
         _model.RecordingStarted += OnRecordingStarted;
         _model.SettingsChanged += RegisterHotkeys;
         DataContext = _model;
-        Loaded += (_, _) => MarkTitleButtonsInteractive(TitleBar);
+        Loaded += (_, _) =>
+        {
+            MarkTitleButtonsInteractive(TitleBar);
+            _ = _model.Updates.StartAsync(_model.Settings.CheckUpdatesOnStartup);
+        };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
