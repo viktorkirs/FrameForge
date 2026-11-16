@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.5.0
+
+- Keep absolute clip positions on the main track as well as extra tracks. Left-edge trimming moves
+  the left edge; right-edge trimming moves the right edge. Moving, trimming and deleting leave other
+  clips untouched. Preview and export render empty intervals as black video and silence.
+- Add independent vertical and horizontal wheel scrolling (Ctrl+wheel for time), timeline fit and
+  scrolling buttons, adjustable track height and live splitters for the preview, timeline and inspector.
+- Select a time range across every lane and cut/delete it in one undoable operation. Copy/paste clips,
+  ranges and entire tracks, preserving source settings and creating independent edit identities.
+- Add prominent Recording/Editor navigation and preserve unfinished editing sessions when switching.
+- Replace native message boxes with themed dialogs and translated Save / Don't save / Cancel actions.
+- Save version-two `.ffproj` placements and compact track height; migrate version-one projects on load.
+
+## 1.4.0
+
+- Extend editing to multiple source videos and independent video/audio tracks with timed placement,
+  waveforms, splitting, trimming, volume, mute and shared undo/redo.
+- Crop directly in the preview with eight handles, a thirds grid and shaded margins. Drag the frame
+  to reposition it, resize with its handles, rotate in 90° steps, or use optional precise settings.
+- Record the selected microphone while playing the montage and add the saved WAV as a new voiceover track.
+- Add per-clip alpha fade-in/fade-out and landscape, portrait and square MP4 output presets.
+- Save and resume editable `.ffproj` projects with relative media paths, source relinking, canvas format,
+  playhead and zoom. Register an optional per-user project file association in the installer.
+- Hide the capture-region border and toolbar while editing, then restore them when the editor closes.
+- Use the supplied SVG Repo icon artwork as native WPF vectors, with no additional runtime dependency.
+
 ## 1.3.0
 
 - Add a recording editor with a seekable preview, linked video/audio lanes, source thumbnails,

@@ -25,7 +25,7 @@ Screen capture and hardware encoding depend on the available graphics drivers an
 - Record a monitor, an application window, or a selected screen region to H.264 MP4.
 - Capture system audio and microphone audio independently, with device selection and circular level meters.
 - Pause and resume, take PNG screenshots, and configure global keyboard shortcuts.
-- Edit recordings with a preview, audio waveform, splitting, trimming and reordering of linked video/audio clips.
+- Edit recordings with a preview, waveforms, independent clip placement and linked video/audio trimming.
 - Move a selected region and edit its size before recording starts.
 - Find windows using live thumbnails and search.
 - Smooth the recorded cursor with acceleration, braking, arc and spiral paths.
@@ -39,11 +39,44 @@ The program checks GitHub for a newer installer on startup and offers a download
 Use **About → Check for updates** to check manually, or disable startup checks in **Settings → General**.
 Downloads open in your browser; installation remains manual.
 
-After stopping a recording, click **Edit video**. The pencil in the title bar also opens the editor for
-an existing MP4. Click the ruler to seek, use **Split** (`Ctrl+B`), drag blocks to reorder them and drag
+Use the equally prominent **Recording** and **Editor** buttons to switch workspaces. Returning to
+recording pauses and hides the editor; returning to editing restores the same unfinished project.
+Click the timeline to seek, use **Split** (`Ctrl+B`), drag blocks to move them independently and drag
 their edges to trim. `Delete` removes the selected block, `Ctrl+Z` / `Ctrl+Y` undo and redo, and Space
 plays or pauses. The source in/out fields accept precise times. **Export MP4** saves a separate file
-and preserves the original. Video and audio stay linked, with gaps closed automatically.
+and preserves the original. A video's audio stays linked to it; other clips keep their positions.
+Trimming either edge moves only that edge. Empty timeline intervals remain black and silent in the export.
+
+Use the wheel to scroll tracks and **Ctrl+wheel** to scroll time horizontally. **Track height** makes
+lanes compact, while the separate zoom slider changes the time scale. Drag the splitters to allocate
+space to the preview/timeline or resize the tools panel. The arrow buttons scroll horizontally and
+**Fit** fits the whole project into view.
+
+Drag across the ruler (or Shift+drag) to select one time range across every lane. **Cut range** (`Ctrl+X`)
+copies and removes that zone without shifting later clips; Delete removes it without copying.
+`Ctrl+C` / `Ctrl+V` copy and paste clips or ranges at the playhead. **Copy track / Paste track**
+(`Ctrl+Shift+C` / `Ctrl+Shift+V`) create an independent copy with the same timing. Pasting into an
+occupied interval creates another lane rather than displacing existing clips.
+
+Use **Add video** to append another source, or create a **Video track** first to overlay it at the playhead.
+Extra tracks keep their own timing: drag their blocks to move them, drag their edges to trim, and use
+the track's speaker button to mute it. **Add audio** imports music or an existing voice recording.
+**Record voiceover** starts playback and records only the selected microphone from the playhead;
+stopping playback adds a new audio track. WAV files are kept in the output folder's `Voiceovers` directory.
+
+Edit the picture directly in the preview. Drag its body to move it or its handles to resize it.
+**Crop frame** shows the full source with eight crop handles; drag a handle or draw a new rectangle,
+then choose **Done**. Hold Shift to move the crop rectangle. Rotation buttons turn the picture by 90°.
+The inspector also has volume, fade-in/fade-out sliders and optional precise settings.
+Choose the output canvas under **Video format**: original, landscape 16:9, portrait 9:16 or square 1:1.
+The preview and exported MP4 use the same format; scale and reposition individual clips to compose it.
+
+**Save project** (`Ctrl+S`) writes an editable `.ffproj`; `Ctrl+Shift+S` saves a copy and `Ctrl+O` opens one.
+Projects retain clips, layers, transforms, fades, volumes, canvas format, playhead and timeline zoom.
+Version-two projects retain absolute placements and track height; version-one projects migrate on load.
+Projects reference the original video/audio files rather than embedding them. Keep those files with the
+project when moving it; relative paths let a project folder move together. If media is missing,
+FrameForge asks for its new location before replacing the current editing session.
 
 When a captured window changes size, the full image is fitted into the recording's fixed canvas.
 Black bars preserve its aspect ratio; the MP4 resolution remains constant.

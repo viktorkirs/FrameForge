@@ -14,7 +14,8 @@ internal static partial class Program
 {
     static void RunVideoEditTimelineTests()
     {
-        Test("montage maps cuts, trim and reordered clips to source time", () =>
+        RunEditorTrackCoreTests();
+        Test("trimming either edge preserves neighboring clip positions and source mapping", () =>
         {
             var timeline = new VideoEditTimeline(TimeSpan.FromSeconds(10));
             Check(!timeline.Split(TimeSpan.Zero) && !timeline.Split(timeline.Duration), "Accepted an empty cut");
@@ -22,11 +23,12 @@ internal static partial class Program
             Check(timeline.Clips.Count == 3 && timeline.Duration == TimeSpan.FromSeconds(10), "Split changed duration");
             Check(timeline.Resolve(TimeSpan.FromSeconds(3)) is { ClipIndex: 1, SourceTime.TotalSeconds: 3 }, "Cut boundary maps to previous clip");
             Check(timeline.Trim(1, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(6)), "Trim failed");
-            Check(timeline.Duration == TimeSpan.FromSeconds(8), "Trim did not close gap");
-            Check(timeline.Move(2, 0), "Reorder failed");
-            Check(timeline.Resolve(TimeSpan.Zero) is { SourceTime.TotalSeconds: 7 }, "Reorder did not move source");
-            Check(timeline.Resolve(TimeSpan.FromSeconds(3)) is { SourceTime.TotalSeconds: 0 }, "Next clip has wrong source time");
-            Check(timeline.Resolve(timeline.Duration)!.Value.SourceTime < TimeSpan.FromSeconds(6), "End maps outside source interval");
+            Check(timeline.Duration == TimeSpan.FromSeconds(10) && timeline.Clips[1].Position.TotalSeconds == 4, "Left trim moved the wrong edge or shortened the whole project");
+            Check(timeline.Clips[0].Position.TotalSeconds == 0 && timeline.Clips[2].Position.TotalSeconds == 7, "Trim moved a neighboring clip");
+            Check(timeline.Resolve(TimeSpan.FromSeconds(3.5)) == null && timeline.Resolve(TimeSpan.FromSeconds(6.5)) == null, "Empty intervals resolve to an old frame");
+            Check(timeline.Resolve(TimeSpan.FromSeconds(4.5)) is { SourceTime.TotalSeconds: 4.5 }, "Retained source time is wrong");
+            Check(!timeline.Split(TimeSpan.FromSeconds(3.5)), "Split created video inside a black interval");
+            Check(timeline.Resolve(timeline.Duration)!.Value.SourceTime < TimeSpan.FromSeconds(10), "End maps outside source interval");
             Check(!timeline.Trim(0, TimeSpan.FromSeconds(-1), TimeSpan.FromSeconds(2)) &&
                 !timeline.Trim(0, TimeSpan.Zero, TimeSpan.FromSeconds(11)) &&
                 !timeline.Trim(0, TimeSpan.Zero, TimeSpan.FromMilliseconds(1)), "Accepted invalid source bounds");
@@ -37,16 +39,17 @@ internal static partial class Program
             timeline.Split(TimeSpan.FromSeconds(2));
             timeline.Split(TimeSpan.FromSeconds(4));
             VideoEditClip[] before = timeline.Clips.ToArray();
-            timeline.Move(2, 0);
+            timeline.SelectedIndex = 1;
             timeline.DeleteSelected();
-            Check(timeline.Duration == TimeSpan.FromSeconds(4), "Delete did not ripple");
-            Check(timeline.Undo() && timeline.Undo() && timeline.Clips.SequenceEqual(before), "Undo lost source ranges or order");
-            Check(timeline.Redo() && timeline.SelectedIndex == 0, "Redo lost selection");
-            timeline.Trim(0, TimeSpan.FromSeconds(4.5), TimeSpan.FromSeconds(5.5));
+            Check(timeline.Duration == TimeSpan.FromSeconds(6) && timeline.Resolve(TimeSpan.FromSeconds(3)) == null, "Delete moved its neighbors");
+            Check(timeline.Undo() && timeline.Clips.SequenceEqual(before), "Undo lost source ranges or positions");
+            timeline.SelectedIndex = 2; Check(timeline.SetSelectedPosition(TimeSpan.FromSeconds(8)), "Could not move the last clip independently");
+            Check(timeline.Undo() && timeline.Redo() && timeline.SelectedIndex == 2, "Movement history lost selection");
+            timeline.Trim(2, TimeSpan.FromSeconds(4.5), TimeSpan.FromSeconds(5.5));
             Check(!timeline.CanRedo, "New edit retained redo branch");
             while (timeline.Clips.Count > 0) timeline.DeleteSelected();
             Check(timeline.Duration == TimeSpan.Zero && timeline.Resolve(TimeSpan.Zero) == null, "Empty timeline mapped a clip");
-            Check(!timeline.DeleteSelected() && !timeline.Move(0, 1), "Invalid edit changed empty timeline");
+            Check(!timeline.DeleteSelected() && !timeline.SetSelectedPosition(TimeSpan.FromSeconds(1)), "Invalid edit changed empty timeline");
             Check(timeline.Undo() && timeline.Clips.Count == 1, "Could not restore last clip");
             while (timeline.Undo()) { }
             Check(!timeline.HasChanges && timeline.Duration == TimeSpan.FromSeconds(6), "Undo did not restore original");
@@ -99,7 +102,8 @@ internal static partial class Program
             timeline.DeleteSelected();
             timeline.Trim(0, TimeSpan.FromSeconds(.4), TimeSpan.FromSeconds(1.6));
             timeline.Trim(1, TimeSpan.FromSeconds(4.2), TimeSpan.FromSeconds(5.6));
-            timeline.Move(1, 0);
+            timeline.SelectedIndex = 0; timeline.SetSelectedPosition(TimeSpan.FromSeconds(1.4));
+            timeline.SelectedIndex = 1; timeline.SetSelectedPosition(TimeSpan.Zero);
             string destination = Path.Combine(_output, "editor-montage.mp4");
             Wait(VideoEditorMedia.ExportAsync(source, timeline.Clips, destination));
             StreamTimeline video = MediaTimelineProbe.Read(destination);
@@ -120,6 +124,7 @@ internal static partial class Program
         {
             var timeline = new VideoEditTimeline(TimeSpan.FromSeconds(6));
             timeline.Trim(0, TimeSpan.FromSeconds(.3), TimeSpan.FromSeconds(1.3));
+            timeline.SetSelectedPosition(TimeSpan.Zero);
             string destination = Path.Combine(_output, "editor-silent-trim.mp4");
             Wait(VideoEditorMedia.ExportAsync(silent, timeline.Clips, destination));
             Check(!AudioProbe.Read(destination).HasAudio, "Silent export acquired an audio track");
@@ -145,6 +150,7 @@ internal static partial class Program
         Test("editor paused scrubbing, playback, controls and translated layouts work", () => EditorWindowChecks(source));
         Test("timeline hover distinguishes movement and trimming and highlights handles", EditorHoverChecks);
         Test("trimmed preview steps frames, excludes the out point and keeps the latest seek", () => EditorTrimFrameChecks(frames));
+        RunEditorTrackMediaTests(source, silent);
     }
 
     static void CreateEditorSource(string path, bool audio, bool everyFrame = false)
@@ -195,16 +201,16 @@ internal static partial class Program
                 typeof(VideoEditorWindow).GetMethod("Trim_Click", flags)!.Invoke(editor, [editor, new RoutedEventArgs()]);
             }
             Trim(1, 5);
-            seek.Value = .5;
-            Check(WaitForPreviewColor(player, 2), "Left trim broke paused seeking to a red source frame");
             seek.Value = 1.5;
+            Check(WaitForPreviewColor(player, 2), "Left trim broke paused seeking to a red source frame");
+            seek.Value = 2.5;
             Check(WaitForPreviewColor(player, 1), "Left trim broke paused seeking to a green source frame");
-            seek.Value = 3.5;
+            seek.Value = 4.5;
             Check(WaitForPreviewColor(player, 0), "Right trim broke paused seeking to a blue source frame");
-            seek.Value = 4;
+            seek.Value = 5;
             Check(WaitForPreviewColor(player, 0), "End of a trimmed clip did not show its last retained frame");
             Trim(2.5, 3.5);
-            seek.Value = .8;
+            seek.Value = 3.3;
             Check(WaitForPreviewColor(player, 1), "Repeated trim broke paused preview");
             ((Button)editor.FindName("UndoButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             ((Button)editor.FindName("UndoButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -215,17 +221,21 @@ internal static partial class Program
             seek.Value = 2;
             ((Button)editor.FindName("SplitButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(timeline.Clips.Count == 2, "Split button did not cut at playhead");
+            timeline.SetSelectedPosition(TimeSpan.FromSeconds(3));
+            typeof(VideoEditorWindow).GetMethod("AfterEdit", flags)!.Invoke(editor, [true, null]);
             ((Button)editor.FindName("MoveLeftButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Check(timeline.Clips[0].Start == TimeSpan.FromSeconds(2), "Move button did not reorder blocks");
+            Check(timeline.Clips[0].Position == TimeSpan.Zero && timeline.Clips[1].Position == TimeSpan.FromSeconds(2.9), "Nudging a clip moved its neighbor");
             Check(Math.Abs(player.Position.TotalSeconds - 2) < .1, "Preview did not seek into moved source clip");
             ((Button)editor.FindName("PlayButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             for (int attempt = 0; attempt < 40 && player.Position <= TimeSpan.FromSeconds(2.1); attempt++) Wait(Task.Delay(50));
             Check(player.Position > TimeSpan.FromSeconds(2.1), "Preview did not advance during playback");
             ((Button)editor.FindName("PlayButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            seek.Value = 3.9;
+            seek.Value = 1.9;
             ((Button)editor.FindName("PlayButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            for (int attempt = 0; attempt < 40 && !(seek.Value > 4 && player.Position < TimeSpan.FromSeconds(1)); attempt++) Wait(Task.Delay(50));
-            Check(seek.Value > 4 && player.Position < TimeSpan.FromSeconds(1), "Playback did not cross into the next reordered clip");
+            for (int attempt = 0; attempt < 20 && seek.Value < 2.1; attempt++) Wait(Task.Delay(50));
+            Check(player.Visibility == Visibility.Collapsed, "Playback retained the previous video in a black interval");
+            for (int attempt = 0; attempt < 40 && seek.Value < 3.05; attempt++) Wait(Task.Delay(50));
+            Check(seek.Value > 2.9 && player.Visibility == Visibility.Visible && player.Position.TotalSeconds >= 2, "Playback did not resume after an empty interval");
             ((Button)editor.FindName("PlayButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             foreach (AppLanguage language in Enum.GetValues<AppLanguage>())
             {
@@ -300,7 +310,7 @@ internal static partial class Program
             SaveWindow(window, "editor-trim-handle-hover.png");
             int enlarged = (50 * 600 + 20) * 4;
             Check(handle[enlarged] > 220 && handle[enlarged + 1] > 220 && handle[enlarged + 2] > 220, $"Hovered trim handle did not expand and brighten ({handle[enlarged]}/{handle[enlarged + 1]}/{handle[enlarged + 2]})");
-            Hover(new Point(582, 85));
+            Hover(new Point(12 + control.Timeline!.Duration.TotalSeconds * control.PixelsPerSecond - 6, 85));
             Check(control.Cursor == Cursors.SizeWE && (string)control.ToolTip == Loc.Get("EditorTrimEnd"), "Right handle lacks its trim cursor or tooltip");
             Hover(new Point(200, 15));
             Check(control.Cursor == Cursors.IBeam, "Ruler has a clip movement cursor");
@@ -340,11 +350,11 @@ internal static partial class Program
             Trim(.5, 2);
             for (int frame = 0; frame < 9; frame++)
             {
-                seek.Value = frame / 30d;
+                seek.Value = .5 + frame / 30d;
                 SettledFrame(2 - (15 + frame) % 3, "Frame stepping after trimming returned the wrong source frame");
             }
-            for (int frame = 0; frame < 40; frame++) seek.Value = frame % 12 / 30d;
-            seek.Value = 5 / 30d;
+            for (int frame = 0; frame < 40; frame++) seek.Value = .5 + frame % 12 / 30d;
+            seek.Value = .5 + 5 / 30d;
             SettledFrame(0, "A stale asynchronous seek replaced the latest selected frame");
             double playhead = seek.Value;
             typeof(VideoEditorWindow).GetMethod("PreviewTrimFrame", flags)!.Invoke(editor,
@@ -358,10 +368,10 @@ internal static partial class Program
             seek.Value = seek.Maximum;
             SettledFrame(0, "Repeated trimming stopped updating the final retained frame");
             ((Button)editor.FindName("UndoButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            seek.Value = 1 / 30d;
+            seek.Value = .5 + 1 / 30d;
             SettledFrame(1, "Undo failed to restore the trimmed source-time mapping");
             ((Button)editor.FindName("RedoButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            seek.Value = 1 / 30d;
+            seek.Value = .8 + 1 / 30d;
             SettledFrame(1, "Redo failed to restore the trimmed source-time mapping");
             SaveWindow(editor, "editor-trimmed-frame-preview.png");
         }

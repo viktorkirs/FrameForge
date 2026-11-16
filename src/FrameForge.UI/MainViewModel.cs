@@ -18,6 +18,8 @@ public sealed class MainViewModel : ObservableObject
     readonly RecordingEngine _engine;
     readonly MarkerController _markerController;
     readonly RegionBorder _regionBorder = new();
+    bool _editorOpen;
+    VideoEditorWindow? _editorWindow;
     readonly DispatcherTimer _timer;
     AppSettings _settings;
     IReadOnlyList<MonitorInfo> _monitors = [];
@@ -64,6 +66,7 @@ public sealed class MainViewModel : ObservableObject
         RegionModeCommand = new RelayCommand(SelectRegion, () => !IsRecording && !_busy);
         OpenFolderCommand = new RelayCommand(OpenSavedFolder, () => CanOpenFolder);
         EditVideoCommand = new RelayCommand(EditVideo, () => !IsRecording && !_busy && !_finishing);
+        RecordingWorkspaceCommand = new RelayCommand(SwitchToRecording);
         _regionX = _settings.RegionX;
         _regionY = _settings.RegionY;
         _regionWidth = _settings.RegionWidth;
@@ -106,6 +109,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand RegionModeCommand { get; }
     public RelayCommand OpenFolderCommand { get; }
     public RelayCommand EditVideoCommand { get; }
+    public RelayCommand RecordingWorkspaceCommand { get; }
     public AppUpdateViewModel Updates { get; } = new();
     public string ScreenTag => _settings.Mode == CaptureMode.Monitor ? "Selected" : "";
     public string WindowTag => _settings.Mode == CaptureMode.Window ? "Selected" : "";
@@ -238,6 +242,7 @@ public sealed class MainViewModel : ObservableObject
 
     async Task ToggleRecordAsync()
     {
+        if (_editorOpen) SwitchToRecording();
         if (_finishRequested || _finishing)
             return;
         if (IsRecording)
@@ -694,7 +699,7 @@ public sealed class MainViewModel : ObservableObject
 
     void SyncRegionBorder()
     {
-        if (_settings.Mode == CaptureMode.Region && _regionWidth >= 16 && _regionHeight >= 16)
+        if (!_editorOpen && _settings.Mode == CaptureMode.Region && _regionWidth >= 16 && _regionHeight >= 16)
             _regionBorder.Show(_regionX, _regionY, _regionWidth, _regionHeight);
         else
             _regionBorder.Hide();
@@ -981,14 +986,58 @@ public sealed class MainViewModel : ObservableObject
 
     void EditVideo()
     {
-        SetBusy(true);
+        string? path = _lastVideoFile != null && File.Exists(_lastVideoFile) ? _lastVideoFile : null;
+        OpenVideoEditor(path);
+    }
+
+    public void OpenVideoProject(string path)
+    {
+        if (!IsRecording && !_busy && !_finishing) OpenVideoEditor(path, replace: true);
+    }
+
+    void OpenVideoEditor(string? path, bool replace = false)
+    {
+        _editorOpen = true;
+        _regionBorder.Hide();
         try
         {
-            string? path = _lastVideoFile != null && File.Exists(_lastVideoFile) ? _lastVideoFile : null;
-            new VideoEditorWindow(path) { Owner = Application.Current.MainWindow }.ShowDialog();
+            if (_editorWindow == null)
+            {
+                var editor = new VideoEditorWindow(path) { Owner = Application.Current.MainWindow };
+                _editorWindow = editor;
+                editor.RecordingRequested += SwitchToRecording;
+                editor.Closed += (_, _) =>
+                {
+                    _editorWindow = null; _editorOpen = false; SyncRegionBorder();
+                    if (!_shuttingDown) ActivateRecordingWindow();
+                };
+                editor.Show();
+            }
+            else
+            {
+                _editorWindow.Show();
+                if (replace && path != null) _editorWindow.OpenDocument(path);
+            }
+            if (_editorWindow.WindowState == WindowState.Minimized) _editorWindow.WindowState = WindowState.Normal;
+            _editorWindow.Activate();
         }
-        finally { SetBusy(false); }
+        catch { _editorOpen = false; SyncRegionBorder(); throw; }
     }
+
+    public void SwitchToRecording()
+    {
+        _editorWindow?.SuspendAndHide();
+        _editorOpen = false; SyncRegionBorder(); ActivateRecordingWindow();
+    }
+
+    static void ActivateRecordingWindow()
+    {
+        if (Application.Current.MainWindow is not { } main) return;
+        if (main.WindowState == WindowState.Minimized) main.WindowState = WindowState.Normal;
+        main.Show(); main.Activate();
+    }
+
+    public async Task<bool> CloseEditorAsync() => _editorWindow == null || await _editorWindow.TryCloseProjectAsync();
 
     void NotifyRecording()
     {

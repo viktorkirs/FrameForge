@@ -4,6 +4,8 @@ using FrameForge.Core;
 using Windows.Media.Editing;
 using Windows.Media.MediaProperties;
 using Windows.Media.Transcoding;
+using Windows.Media.Effects;
+using Windows.Foundation;
 using Windows.Storage;
 
 namespace FrameForge.UI;
@@ -14,9 +16,17 @@ internal readonly record struct VideoEditorFrameRequest(TimeSpan Position, TimeS
 /// <summary>A source decoder reused for paused frame requests, independent of the playback clock.</summary>
 internal sealed class VideoEditorPreview(MediaComposition composition, VideoEditorSource source)
 {
+    readonly SemaphoreSlim _decodeGate = new(1, 1);
     public VideoEditorSource Source { get; } = source;
 
     public async Task<BitmapSource> ReadFrameAsync(VideoEditorFrameRequest request, CancellationToken cancellationToken)
+    {
+        await _decodeGate.WaitAsync(cancellationToken);
+        try { return await ReadFrameCoreAsync(request, cancellationToken); }
+        finally { _decodeGate.Release(); }
+    }
+
+    async Task<BitmapSource> ReadFrameCoreAsync(VideoEditorFrameRequest request, CancellationToken cancellationToken)
     {
         // Source frame timestamps are rounded to ticks; allow that rounding at frame boundaries.
         // The out point is exclusive: seeking to the clip's end must show its last retained frame.
@@ -41,6 +51,187 @@ internal sealed class VideoEditorPreview(MediaComposition composition, VideoEdit
 
 public static class VideoEditorMedia
 {
+    public static async Task<TimeSpan> ReadAudioDurationAsync(string path)
+    {
+        var file = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
+        return (await BackgroundAudioTrack.CreateFromFileAsync(file)).OriginalDuration;
+    }
+
+    public static async Task ExportAsync(VideoEditSnapshot snapshot, string destinationPath, uint width, uint height,
+        double frameRate, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var intermediates = new List<string>();
+        try { await ExportCompositionAsync(snapshot, destinationPath, width, height, frameRate, intermediates, progress, cancellationToken); }
+        finally { foreach (string path in intermediates) if (File.Exists(path)) File.Delete(path); }
+    }
+
+    static async Task ExportCompositionAsync(VideoEditSnapshot snapshot, string destinationPath, uint width, uint height,
+        double frameRate, List<string> intermediates, IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        string destination = Path.GetFullPath(destinationPath);
+        VideoEditClip[] all = snapshot.Clips.Concat(snapshot.Tracks.SelectMany(track => track.Clips)).ToArray();
+        if (snapshot.SourcePath != null && string.Equals(Path.GetFullPath(snapshot.SourcePath), destination, StringComparison.OrdinalIgnoreCase) ||
+            all.Any(clip => string.Equals(Path.GetFullPath(clip.SourcePath ?? snapshot.SourcePath!), destination, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException(Loc.Get("EditorProtectSource"));
+        if (snapshot.Duration < VideoEditTimeline.MinimumDuration) throw new InvalidOperationException(Loc.Get("EditorEmpty"));
+        cancellationToken.ThrowIfCancellationRequested();
+        var composition = new MediaComposition();
+        composition.Clips.Add(MediaClip.CreateFromColor(Windows.UI.Color.FromArgb(255, 0, 0, 0), snapshot.Duration));
+        var originals = new Dictionary<string, MediaClip>(StringComparer.OrdinalIgnoreCase);
+        bool hasAudio = false;
+        VideoEditClip[] videos = snapshot.Clips.Concat(snapshot.Tracks.Where(track => track.Kind == VideoEditTrackKind.Video).SelectMany(track => track.Clips)).ToArray();
+        static bool NeedsTransform(VideoEditClip clip) => clip.Transform.Left != 0 || clip.Transform.Top != 0 || clip.Transform.Right != 0 || clip.Transform.Bottom != 0 || clip.Transform.QuarterTurns != 0;
+        int transformCount = videos.Count(NeedsTransform), transformed = 0;
+
+        async Task AddVideo(VideoEditClip interval, TimeSpan position, MediaOverlayLayer layer, bool muted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string path = Path.GetFullPath(interval.SourcePath ?? snapshot.SourcePath!);
+            if (!originals.TryGetValue(path, out MediaClip? original))
+            {
+                original = await MediaClip.CreateFromFileAsync(await StorageFile.GetFileFromPathAsync(path));
+                originals.Add(path, original);
+            }
+            ValidateInterval(interval, original.OriginalDuration);
+            MediaClip clip = original.Clone();
+            clip.TrimTimeFromStart = interval.Start;
+            clip.TrimTimeFromEnd = original.OriginalDuration - interval.End;
+            clip.Volume = muted ? 0 : interval.Volume;
+            VideoEncodingProperties video = original.GetVideoEncodingProperties();
+            VideoFrameTransform transform = interval.Transform;
+            double cropWidth = Math.Max(2, video.Width * (1 - transform.Left - transform.Right));
+            double cropHeight = Math.Max(2, video.Height * (1 - transform.Top - transform.Bottom));
+            bool rotated = transform.QuarterTurns % 2 == 1;
+            double rotatedWidth = rotated ? cropHeight : cropWidth, rotatedHeight = rotated ? cropWidth : cropHeight;
+            if (NeedsTransform(interval))
+            {
+                var effect = new VideoTransformEffectDefinition
+                {
+                    // The Windows transform applies rotation before cropping, so crop coordinates
+                    // must be expressed in the rotated source, rather than the original frame.
+                    CropRectangle = transform.QuarterTurns switch
+                    {
+                        1 => new Rect(video.Height * transform.Bottom, video.Width * transform.Left, cropHeight, cropWidth),
+                        2 => new Rect(video.Width * transform.Right, video.Height * transform.Bottom, cropWidth, cropHeight),
+                        3 => new Rect(video.Height * transform.Top, video.Width * transform.Right, cropHeight, cropWidth),
+                        _ => new Rect(video.Width * transform.Left, video.Height * transform.Top, cropWidth, cropHeight)
+                    },
+                    Rotation = (MediaRotation)transform.QuarterTurns,
+                    OutputSize = new Size(Even(rotatedWidth), Even(rotatedHeight)),
+                    PaddingColor = Windows.UI.Color.FromArgb(255, 0, 0, 0)
+                };
+                string intermediate = Path.Combine(Path.GetDirectoryName(destination)!, $".frameforge-transform-{Guid.NewGuid():N}.mp4");
+                intermediates.Add(intermediate);
+                using (File.Create(intermediate)) { }
+                var target = await StorageFile.GetFileFromPathAsync(intermediate);
+                var transformedProfile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD720p);
+                transformedProfile.Video.Width = (uint)Even(rotatedWidth);
+                transformedProfile.Video.Height = (uint)Even(rotatedHeight);
+                transformedProfile.Video.FrameRate.Numerator = video.FrameRate.Numerator;
+                transformedProfile.Video.FrameRate.Denominator = video.FrameRate.Denominator;
+                transformedProfile.Audio = null; // Mix original audio once, without intermediate AAC generations.
+                var transcoder = new MediaTranscoder { TrimStartTime = interval.Start, TrimStopTime = interval.End };
+                transcoder.AddVideoEffect(effect.ActivatableClassId, true, effect.Properties);
+                PrepareTranscodeResult prepared = await transcoder.PrepareFileTranscodeAsync(await StorageFile.GetFileFromPathAsync(path), target, transformedProfile).AsTask(cancellationToken);
+                if (!prepared.CanTranscode) throw new InvalidOperationException(Loc.Format("EditorExportFailed", prepared.FailureReason));
+                int ordinal = transformed;
+                var transformProgress = new Progress<double>(value => progress?.Report((ordinal + value / 100) / transformCount * 40));
+                await prepared.TranscodeAsync().AsTask(cancellationToken, transformProgress);
+                transformed++;
+                clip = await MediaClip.CreateFromFileAsync(target);
+                if (clip.OriginalDuration > interval.Duration) clip.TrimTimeFromEnd = clip.OriginalDuration - interval.Duration;
+                clip.Volume = muted ? 0 : interval.Volume;
+            }
+            double scale = Math.Min(width / rotatedWidth, height / rotatedHeight) * transform.Scale;
+            double w = rotatedWidth * scale, h = rotatedHeight * scale;
+            var rectangle = new Rect((width - w) / 2 + transform.OffsetX * width, (height - h) / 2 + transform.OffsetY * height, w, h);
+            if (interval.FadeIn == TimeSpan.Zero && interval.FadeOut == TimeSpan.Zero)
+                layer.Overlays.Add(new MediaOverlay(clip, rectangle, 1) { Delay = position, AudioEnabled = false });
+            else
+            {
+                // Native overlays keep their source interval and opacity independently. Splitting
+                // only the fade region gives frame-stepped alpha without an external codec/runtime.
+                long duration = Math.Min(interval.Duration.Ticks, clip.TrimmedDuration.Ticks);
+                long step = Math.Max(1, (long)Math.Round(TimeSpan.TicksPerSecond / Math.Clamp(frameRate, 1, 60)));
+                var cuts = new SortedSet<long> { 0, duration };
+                for (long tick = 0; tick < Math.Min(duration, interval.FadeIn.Ticks); tick += step) cuts.Add(tick);
+                cuts.Add(Math.Min(duration, interval.FadeIn.Ticks));
+                for (long tick = Math.Max(0, duration - interval.FadeOut.Ticks); tick < duration; tick += step) cuts.Add(tick);
+                long[] boundaries = cuts.ToArray();
+                for (int i = 0; i < boundaries.Length - 1; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    long from = boundaries[i], to = boundaries[i + 1];
+                    if (to <= from) continue;
+                    var part = clip.Clone();
+                    part.TrimTimeFromStart = clip.TrimTimeFromStart + TimeSpan.FromTicks(from);
+                    part.TrimTimeFromEnd = clip.TrimTimeFromEnd + TimeSpan.FromTicks(clip.TrimmedDuration.Ticks - to);
+                    layer.Overlays.Add(new MediaOverlay(part, rectangle, interval.OpacityAt(TimeSpan.FromTicks(from)))
+                    { Delay = position + TimeSpan.FromTicks(from), AudioEnabled = false });
+                }
+            }
+            if (!muted && interval.Volume > 0 && original.EmbeddedAudioTracks.Count > 0)
+            {
+                BackgroundAudioTrack audio = BackgroundAudioTrack.CreateFromEmbeddedAudioTrack(original.EmbeddedAudioTracks[0]);
+                if (interval.Start < audio.OriginalDuration)
+                {
+                    audio.TrimTimeFromStart = interval.Start;
+                    audio.TrimTimeFromEnd = TimeSpan.FromTicks(Math.Max(0, (audio.OriginalDuration - interval.End).Ticks));
+                    audio.Delay = position; audio.Volume = interval.Volume;
+                    composition.BackgroundAudioTracks.Add(audio); hasAudio = true;
+                }
+            }
+        }
+
+        var main = new MediaOverlayLayer();
+        foreach (VideoEditClip clip in snapshot.Clips)
+        {
+            await AddVideo(clip, clip.Position, main, snapshot.MainMuted);
+        }
+        if (main.Overlays.Count > 0) composition.OverlayLayers.Add(main);
+        foreach (VideoEditTrack track in snapshot.Tracks)
+        {
+            if (track.Kind == VideoEditTrackKind.Video)
+            {
+                var layer = new MediaOverlayLayer();
+                foreach (VideoEditClip clip in track.Clips) await AddVideo(clip, clip.Position, layer, track.Muted);
+                if (layer.Overlays.Count > 0) composition.OverlayLayers.Add(layer);
+            }
+            else foreach (VideoEditClip interval in track.Clips)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var file = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(interval.SourcePath!));
+                BackgroundAudioTrack audio = await BackgroundAudioTrack.CreateFromFileAsync(file);
+                ValidateInterval(interval, audio.OriginalDuration);
+                audio.TrimTimeFromStart = interval.Start;
+                audio.TrimTimeFromEnd = audio.OriginalDuration - interval.End;
+                audio.Delay = interval.Position;
+                audio.Volume = track.Muted ? 0 : interval.Volume;
+                composition.BackgroundAudioTracks.Add(audio);
+                hasAudio |= audio.Volume > 0;
+            }
+        }
+        var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD720p);
+        profile.Video.Width = (uint)Even(width);
+        profile.Video.Height = (uint)Even(height);
+        profile.Video.FrameRate.Numerator = (uint)Math.Round(Math.Clamp(frameRate, 1, 120) * 1000);
+        profile.Video.FrameRate.Denominator = 1000;
+        profile.Video.Bitrate = (uint)Math.Clamp(width * (double)height * frameRate * .16, 1_000_000, 60_000_000);
+        if (!hasAudio) profile.Audio = null;
+        IProgress<double>? renderProgress = transformCount == 0 ? progress : new Progress<double>(value => progress?.Report(40 + value * .6));
+        await RenderAsync(composition, profile, destination, renderProgress, cancellationToken);
+    }
+
+    static int Even(double value) => Math.Max(2, (int)Math.Round(value / 2) * 2);
+
+    static void ValidateInterval(VideoEditClip interval, TimeSpan duration)
+    {
+        if (interval.Start < TimeSpan.Zero || interval.End > duration || interval.Duration < VideoEditTimeline.MinimumDuration ||
+            interval.Position < TimeSpan.Zero || !interval.Transform.IsValid || !double.IsFinite(interval.Volume) || interval.Volume is < 0 or > 1 ||
+            interval.FadeIn < TimeSpan.Zero || interval.FadeOut < TimeSpan.Zero || interval.FadeIn + interval.FadeOut > interval.Duration)
+            throw new ArgumentOutOfRangeException(nameof(interval));
+    }
+
     public static async Task<BitmapSource> ReadThumbnailAsync(string path, TimeSpan position)
     {
         var file = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
@@ -75,6 +266,22 @@ public static class VideoEditorMedia
     public static async Task ExportAsync(string sourcePath, IReadOnlyList<VideoEditClip> clips, string destinationPath,
         IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
+        if (clips.Count > 1 && clips.All(clip => clip.Position == TimeSpan.Zero))
+        {
+            TimeSpan next = TimeSpan.Zero;
+            clips = clips.Select(clip => { VideoEditClip positioned = clip with { Position = next }; next += clip.Duration; return positioned; }).ToArray();
+        }
+        TimeSpan expected = TimeSpan.Zero;
+        bool hasGaps = false;
+        foreach (VideoEditClip clip in clips) { hasGaps |= clip.Position != expected; expected = clip.Position + clip.Duration; }
+        if (hasGaps || clips.Any(clip => clip.Transform != new VideoFrameTransform() || clip.Volume != 1 || clip.FadeIn != TimeSpan.Zero || clip.FadeOut != TimeSpan.Zero ||
+            clip.SourcePath != null && !string.Equals(Path.GetFullPath(clip.SourcePath), Path.GetFullPath(sourcePath), StringComparison.OrdinalIgnoreCase)))
+        {
+            VideoEditorSource info = await ReadAsync(sourcePath);
+            await ExportAsync(new(Path.GetFullPath(sourcePath), info.Duration, clips, Array.Empty<VideoEditTrack>(), false), destinationPath,
+                info.Width, info.Height, info.FrameRate, progress, cancellationToken);
+            return;
+        }
         string source = Path.GetFullPath(sourcePath);
         string destination = Path.GetFullPath(destinationPath);
         if (string.Equals(source, destination, StringComparison.OrdinalIgnoreCase))
@@ -93,14 +300,20 @@ public static class VideoEditorMedia
             clip.TrimTimeFromEnd = original.OriginalDuration - interval.End;
             composition.Clips.Add(clip);
         }
+        MediaEncodingProfile profile = composition.CreateDefaultEncodingProfile();
+        if (original.EmbeddedAudioTracks.Count == 0) profile.Audio = null;
+        await RenderAsync(composition, profile, destination, progress, cancellationToken);
+    }
+
+    static async Task RenderAsync(MediaComposition composition, MediaEncodingProfile profile, string destination,
+        IProgress<double>? progress, CancellationToken cancellationToken)
+    {
         // Render beside the destination, then replace it only after a successful, complete export.
         string temporary = Path.Combine(Path.GetDirectoryName(destination)!, $".frameforge-{Guid.NewGuid():N}.mp4");
         try
         {
             using (File.Create(temporary)) { }
             var target = await StorageFile.GetFileFromPathAsync(temporary);
-            MediaEncodingProfile profile = composition.CreateDefaultEncodingProfile();
-            if (original.EmbeddedAudioTracks.Count == 0) profile.Audio = null;
             TranscodeFailureReason result = await composition.RenderToFileAsync(target, MediaTrimmingPreference.Precise, profile)
                 .AsTask(cancellationToken, progress);
             if (result != TranscodeFailureReason.None)

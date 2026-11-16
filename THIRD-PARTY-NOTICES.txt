@@ -2,6 +2,13 @@ FrameForge Recorder
 Copyright (c) 2026 Victor Kirsanov. Project code is licensed under MIT (LICENSE).
 Third-party components retain their own notices and license terms.
 
+Editor icon artwork supplied from SVG Repo by the project maintainer.
+Original SVGs, including their SVG Repo metadata, are retained in src/FrameForge.UI/Assets/EditorIcons/.
+The WPF DrawingImages adapt the colors and scale of these vectors for the editor.
+Sources: https://www.svgrepo.com/collection/minimal-ui-icons/
+and https://www.svgrepo.com/collection/atlas-variety-line-icons/.
+These assets retain their original terms; the project code's MIT license does not replace them.
+
 NAudio 3.3.0 — Mark Heath and contributors — MIT.
 https://github.com/naudio/NAudio
 See licenses/NAudio-LICENSE.txt.

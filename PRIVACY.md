@@ -9,6 +9,12 @@ System audio, microphone audio, cursor effects and temporary annotations are con
 Video, audio and screenshots are written to the selected output location. Settings and local
 diagnostics are stored in the application's user-data folder (or the portable data folder).
 
+The video editor reads the media files selected by the user and records microphone voiceovers only
+after the user starts voiceover recording. Voiceover WAV files remain in the output folder's
+`Voiceovers` subfolder. Editable `.ffproj` files store local media paths and editing settings;
+they do not embed or upload the source videos or audio. Temporary export files are removed after
+successful rendering, cancellation or a handled rendering error.
+
 FrameForge does not upload this content, collect analytics, or report crashes to a server.
 It contains no advertising or account sign-in. Bundled capture,
 audio and encoding components process recording data locally.

@@ -15,6 +15,7 @@ namespace FrameForge.UI;
 
 public partial class VideoEditorWindow : Window
 {
+    public event Action? RecordingRequested;
     readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(20) };
     readonly CancellationTokenSource _lifetime = new();
     CancellationTokenSource? _waveformCancellation, _exportCancellation;
@@ -26,7 +27,6 @@ public partial class VideoEditorWindow : Window
     VideoEditorFrameRequest? _pendingPreviewFrame;
     long _previewRevision;
     bool _previewWorkerRunning;
-    VideoEditClip[]? _exportedClips;
     TimeSpan _position;
     int _activeClip;
     bool _playing, _mediaReady, _updatingPosition, _loading, _exporting, _closed, _closeAfterExport;
@@ -45,12 +45,20 @@ public partial class VideoEditorWindow : Window
         TimelineCanvas.SeekRequested += Seek;
         TimelineCanvas.SelectionChanged += RefreshSelection;
         TimelineCanvas.Edited += position => AfterEdit(previewPosition: position);
+        InitializeTracks();
+        InitializeTimelineTools();
+        Loc.Changed += EditorLanguageChanged;
         RefreshControls();
     }
 
     async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_initialPath != null) await LoadAsync(_initialPath);
+        WorkspaceNavigation.Visibility = RecordingRequested == null ? Visibility.Collapsed : Visibility.Visible;
+        if (_initialPath != null)
+        {
+            if (string.Equals(Path.GetExtension(_initialPath), VideoEditProjectFile.Extension, StringComparison.OrdinalIgnoreCase)) await LoadProjectAsync(_initialPath);
+            else await LoadAsync(_initialPath);
+        }
         else
         {
             PreviewMessage.Text = Loc.Get("EditorOpen");
@@ -58,10 +66,28 @@ public partial class VideoEditorWindow : Window
         }
     }
 
+    public void SuspendAndHide() { Pause(); Hide(); }
+    public async void OpenDocument(string path)
+    {
+        if (_loading || _exporting) return;
+        Pause(); if (!ConfirmDiscard()) return;
+        if (string.Equals(Path.GetExtension(path), VideoEditProjectFile.Extension, StringComparison.OrdinalIgnoreCase)) await LoadProjectAsync(path);
+        else await LoadAsync(path);
+    }
+    public async Task<bool> TryCloseProjectAsync()
+    {
+        Pause();
+        if (_exporting) { _exportCancellation?.Cancel(); await _exportTask; }
+        Close(); return _closed;
+    }
+    void RecordingWorkspace_Click(object sender, RoutedEventArgs e) => RecordingRequested?.Invoke();
+
     async Task LoadAsync(string path)
     {
         if (_loading || _exporting) return;
         Pause();
+        _frameMode = "move";
+        FinishCropButton.Visibility = Visibility.Collapsed;
         _loading = true;
         RefreshControls();
         StatusText.Text = Loc.Get("EditorLoading");
@@ -70,7 +96,7 @@ public partial class VideoEditorWindow : Window
             VideoEditorPreview framePreview = await VideoEditorMedia.OpenPreviewAsync(path);
             VideoEditorSource source = framePreview.Source;
             if (_closed) return;
-            var timeline = new VideoEditTimeline(source.Duration);
+            var timeline = new VideoEditTimeline(source.Duration, Path.GetFullPath(path));
             _waveformCancellation?.Cancel();
             _waveformCancellation?.Dispose();
             _waveformCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -79,12 +105,14 @@ public partial class VideoEditorWindow : Window
             _sourcePath = Path.GetFullPath(path);
             _source = source;
             _framePreview = framePreview;
+            ResetAssets(_sourcePath, framePreview);
             _previewRevision++;
             _pendingPreviewFrame = null;
             PausedFrame.Source = null;
             PausedFrame.Visibility = Visibility.Collapsed;
             _timeline = timeline;
-            _exportedClips = null;
+            ConfigureOutputFormats();
+            _savedProjectState = null; _projectPath = null; _projectNeedsSave = false;
             _position = TimeSpan.Zero;
             _activeClip = 0;
             TimelineCanvas.Timeline = timeline;
@@ -97,12 +125,14 @@ public partial class VideoEditorWindow : Window
             PreviewMessage.Text = Loc.Get("EditorLoading");
             PreviewMessage.Visibility = Visibility.Visible;
             Player.Source = new Uri(_sourcePath);
+            _playerPath = _sourcePath;
             // Manual mode still needs Play/Pause to initialize the video surface.
             Player.Play();
             Player.Pause();
             ZoomSlider.Value = 1;
             StatusText.Text = source.HasAudio ? Loc.Get("EditorWaveform") : Loc.Get("EditorNoAudio");
             RefreshSelection();
+            RefreshTracks();
             UpdatePosition(TimeSpan.Zero);
             UpdateExtent();
             _ = ReadWaveformAsync(_sourcePath, source, _waveformCancellation.Token);
@@ -129,6 +159,7 @@ public partial class VideoEditorWindow : Window
             AudioWaveform waveform = await Task.Run(() => AudioWaveform.Read(path, source.Duration, cancellationToken), cancellationToken);
             if (cancellationToken.IsCancellationRequested || _closed) return;
             TimelineCanvas.Waveform = waveform;
+            TimelineCanvas.Waveforms[path] = waveform;
             TimelineCanvas.InvalidateVisual();
             if (StatusText.Text == Loc.Get("EditorWaveform")) StatusText.Text = "";
         }
@@ -147,19 +178,21 @@ public partial class VideoEditorWindow : Window
         CancellationToken token = _waveformCancellation.Token;
         Dictionary<long, ImageSource> thumbnails = _thumbnails;
         HashSet<long> pending = _pendingThumbnails;
-        foreach (TimeSpan start in _timeline.Clips.Select(clip => clip.Start).Distinct().ToArray())
+        foreach (VideoEditClip clip in _timeline.Clips.Concat(_timeline.Tracks.Where(track => track.Kind == VideoEditTrackKind.Video).SelectMany(track => track.Clips)).ToArray())
         {
+            TimeSpan start = clip.Start;
+            string clipPath = clip.SourcePath ?? path;
             if (token.IsCancellationRequested || _closed) return;
-            if (thumbnails.ContainsKey(start.Ticks) || !pending.Add(start.Ticks)) continue;
+            if (TimelineCanvas.SourceThumbnails.ContainsKey((clipPath, start.Ticks))) continue;
             try
             {
-                ImageSource thumbnail = await VideoEditorMedia.ReadThumbnailAsync(path, start);
+                ImageSource thumbnail = await VideoEditorMedia.ReadThumbnailAsync(clipPath, start);
                 if (token.IsCancellationRequested || _closed) return;
-                thumbnails[start.Ticks] = thumbnail;
+                if (clipPath == path) thumbnails[start.Ticks] = thumbnail;
+                TimelineCanvas.SourceThumbnails[(clipPath, start.Ticks)] = thumbnail;
                 TimelineCanvas.InvalidateVisual();
             }
             catch (Exception ex) { Log.Error("Reading editor thumbnail.", ex); }
-            finally { pending.Remove(start.Ticks); }
         }
     }
 
@@ -183,8 +216,7 @@ public partial class VideoEditorWindow : Window
 
     void Player_Ended(object sender, RoutedEventArgs e)
     {
-        if (!_playing || _timeline == null) return;
-        AdvanceClip();
+        // The montage clock advances across trimmed intervals, different sources and empty gaps.
     }
 
     void AdvanceClip()
@@ -204,11 +236,13 @@ public partial class VideoEditorWindow : Window
 
     void Playback_Tick(object? sender, EventArgs e)
     {
-        if (!_playing || _timeline == null || _activeClip >= _timeline.Clips.Count) return;
-        VideoEditClip clip = _timeline.Clips[_activeClip];
-        TimeSpan sourcePosition = Player.Position;
-        if (sourcePosition >= clip.End) { AdvanceClip(); return; }
-        UpdatePosition(_timeline.StartOf(_activeClip) + TimeSpan.FromTicks(Math.Clamp((sourcePosition - clip.Start).Ticks, 0, clip.Duration.Ticks)));
+        if (!_playing || _timeline == null) return;
+        TimeSpan position = _playStart + _playClock.Elapsed;
+        UpdatePosition(position);
+        if (_position >= _timeline.Duration) { Pause(); Seek(_timeline.Duration); return; }
+        SyncBasePlayback();
+        SyncTrackPlayback();
+        PumpVoice();
         double x = 12 + _position.TotalSeconds * TimelineCanvas.PixelsPerSecond;
         if (x > TimelineScroll.HorizontalOffset + TimelineScroll.ViewportWidth - 20 || x < TimelineScroll.HorizontalOffset)
             TimelineScroll.ScrollToHorizontalOffset(Math.Max(0, x - 30));
@@ -216,20 +250,36 @@ public partial class VideoEditorWindow : Window
 
     void Seek(TimeSpan position)
     {
-        if (_timeline == null || _timeline.Resolve(position) is not { } resolved) return;
+        if (_timeline == null) return;
+        UpdatePosition(position);
+        SyncTrackPlayback(force: true);
+        if (_timeline.Resolve(_position) is not { } resolved)
+        {
+            _activeClip = -1; _previewRevision++; _pendingPreviewFrame = null;
+            Player.Pause(); Player.Visibility = PausedFrame.Visibility = Visibility.Collapsed;
+            UpdatePreviewLayout(); return;
+        }
         _activeClip = resolved.ClipIndex;
+        ActivateBaseSource(_timeline.Clips[_activeClip]);
         if (_mediaReady)
         {
             Player.Position = resolved.SourceTime;
             if (_playing) Player.Play();
         }
-        UpdatePosition(position);
+        UpdatePreviewLayout();
         if (!_playing) RequestPlayheadFrame();
     }
 
     void PreviewTrimFrame(TimeSpan sourceTime, TimeSpan start, TimeSpan end)
     {
         if (_playing || _source == null) return;
+        if (_timeline?.SelectedTrack is { Kind: VideoEditTrackKind.Video } track && _timeline.SelectedClip is { } clip &&
+            _trackPlayers.TryGetValue(track.Id, out TrackPreview? layer))
+        {
+            _ = ReadTrackFrameAsync(layer, clip with { Start = start, End = end }, sourceTime);
+            return;
+        }
+        if (_timeline?.SelectedTrack?.Kind == VideoEditTrackKind.Audio) return;
         // During an edge drag, the pending source bounds are not in the montage yet.
         // Decode the dragged boundary directly instead of resolving it in the old timeline.
         RequestPausedFrame(new(sourceTime, start, end));
@@ -237,7 +287,12 @@ public partial class VideoEditorWindow : Window
 
     void RequestPlayheadFrame()
     {
-        if (_timeline?.Resolve(_position) is not { } resolved) return;
+        if (_timeline?.Resolve(_position) is not { } resolved)
+        {
+            _previewRevision++; _pendingPreviewFrame = null;
+            Player.Pause(); Player.Visibility = PausedFrame.Visibility = Visibility.Collapsed;
+            return;
+        }
         VideoEditClip clip = _timeline.Clips[resolved.ClipIndex];
         RequestPausedFrame(new(resolved.SourceTime, clip.Start, clip.End));
     }
@@ -266,7 +321,8 @@ public partial class VideoEditorWindow : Window
                     ImageSource frame = await preview.ReadFrameAsync(request, _lifetime.Token);
                     if (_closed || _playing || revision != _previewRevision) continue;
                     PausedFrame.Source = frame;
-                    PausedFrame.Visibility = Visibility.Visible;
+                    PausedFrame.Visibility = HasBaseFrame ? Visibility.Visible : Visibility.Collapsed;
+                    UpdatePreviewLayout();
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)
@@ -293,7 +349,11 @@ public partial class VideoEditorWindow : Window
         _updatingPosition = false;
         TimelineCanvas.Position = _position;
         TimeLabel.Text = $"{VideoTimelineControl.Format(_position, true)} / {VideoTimelineControl.Format(_timeline?.Duration ?? TimeSpan.Zero, true)}";
-        if (_timeline?.Resolve(_position) is { } resolved)
+        if (_voiceRecorder == null && _timeline?.SelectedTrackId != null)
+        {
+            SplitButton.IsEnabled = !_exporting && !_loading && _timeline.SelectedClips.Any(clip => _position - clip.Position >= VideoEditTimeline.MinimumDuration && clip.Position + clip.Duration - _position >= VideoEditTimeline.MinimumDuration);
+        }
+        else if (_voiceRecorder == null && _timeline?.Resolve(_position) is { } resolved && _position < _timeline.MainDuration)
         {
             VideoEditClip clip = _timeline.Clips[resolved.ClipIndex];
             SplitButton.IsEnabled = !_exporting && !_loading && resolved.SourceTime - clip.Start >= VideoEditTimeline.MinimumDuration
@@ -304,26 +364,34 @@ public partial class VideoEditorWindow : Window
 
     void TogglePlay()
     {
-        if (_exporting || _loading || !_mediaReady || _timeline?.Clips.Count is not > 0) return;
+        if (_exporting || _loading || _timeline == null || _timeline.Duration <= TimeSpan.Zero) return;
         if (_playing) { Pause(); return; }
         if (_position >= _timeline.Duration) Seek(TimeSpan.Zero);
         _playing = true;
+        _playStart = _position;
+        _playClock.Restart();
+        _voiceRecorder?.Begin();
         _previewRevision++;
         _pendingPreviewFrame = null;
         PausedFrame.Visibility = Visibility.Collapsed;
         // A trim preview can show a boundary without moving the logical playhead.
         Seek(_position);
-        PlayButton.Content = "Ⅱ";
-        Player.Play();
+        PlayButton.Tag = FindResource("EditorIconPause");
+        if (HasBaseFrame) Player.Play();
+        SyncTrackPlayback(force: true);
         _timer.Start();
     }
 
     void Pause()
     {
+        if (_playing && _timeline != null) UpdatePosition(_playStart + _playClock.Elapsed);
         _playing = false;
+        _playClock.Stop();
         _timer.Stop();
         Player.Pause();
-        PlayButton.Content = "▶";
+        PauseTrackPlayback();
+        StopVoice();
+        PlayButton.Tag = FindResource("EditorIconPlay");
         RequestPlayheadFrame();
     }
 
@@ -332,11 +400,12 @@ public partial class VideoEditorWindow : Window
         Pause();
         if (_timeline == null) return;
         RefreshSelection();
+        RefreshTracks();
         UpdateExtent();
-        if (_timeline.Clips.Count > 0)
+        if (_timeline.Duration > TimeSpan.Zero)
         {
-            PreviewMessage.Visibility = _mediaReady ? Visibility.Collapsed : Visibility.Visible;
-            Seek(previewPosition ?? (selectStart ? _timeline.StartOf(_timeline.SelectedIndex) : _position));
+            PreviewMessage.Visibility = Visibility.Collapsed;
+            Seek(previewPosition ?? (selectStart ? _timeline.SelectedStart : _position));
             StatusText.Text = "";
         }
         else
@@ -357,34 +426,51 @@ public partial class VideoEditorWindow : Window
 
     void RefreshSelection()
     {
-        if (_timeline != null && _timeline.SelectedIndex >= 0 && _timeline.SelectedIndex < _timeline.Clips.Count)
+        if (_timeline?.SelectedClip is { } clip)
         {
-            VideoEditClip clip = _timeline.Clips[_timeline.SelectedIndex];
             TrimInBox.Text = VideoTimelineControl.Format(clip.Start, true);
             TrimOutBox.Text = VideoTimelineControl.Format(clip.End, true);
         }
         else TrimInBox.Text = TrimOutBox.Text = "";
+        RefreshInspector();
         TimelineCanvas.InvalidateVisual();
         RefreshControls();
     }
 
     void RefreshControls()
     {
-        bool available = !_loading && !_exporting;
-        bool hasClips = _timeline?.Clips.Count > 0;
-        bool selected = hasClips && _timeline!.SelectedIndex >= 0;
+        bool available = !_loading && !_exporting && _voiceRecorder == null;
+        bool hasClips = _timeline?.Duration > TimeSpan.Zero;
+        bool selected = _timeline?.SelectedClip != null;
         OpenButton.IsEnabled = available;
+        OpenProjectButton.IsEnabled = available;
+        SaveProjectButton.IsEnabled = available && _timeline != null;
         ExportButton.IsEnabled = available && hasClips;
-        Transport.IsEnabled = available && hasClips && _mediaReady;
+        Transport.IsEnabled = !_loading && !_exporting && hasClips;
+        SeekSlider.IsEnabled = available && hasClips;
         EditTools.IsEnabled = available;
+        ImportTools.IsEnabled = available && _timeline != null;
+        Inspector.IsEnabled = available && _timeline != null;
+        VolumeSlider.IsEnabled = selected;
+        FrameTools.IsEnabled = available && selected && _timeline!.SelectedTrack?.Kind != VideoEditTrackKind.Audio;
+        RemoveTrackButton.IsEnabled = _timeline?.SelectedTrack != null;
+        ApplyPositionButton.IsEnabled = selected;
+        TrackPositionBox.IsEnabled = selected;
         TimelineCanvas.IsEnabled = available;
+        TrackHeaders.IsEnabled = available;
         TrimTools.IsEnabled = available && selected;
         DeleteButton.IsEnabled = selected;
-        MoveLeftButton.IsEnabled = selected && _timeline!.SelectedIndex > 0;
-        MoveRightButton.IsEnabled = selected && _timeline!.SelectedIndex < _timeline.Clips.Count - 1;
+        MoveLeftButton.IsEnabled = selected && _timeline!.CanPlaceSelected(_timeline.SelectedStart - TimeSpan.FromSeconds(.1));
+        MoveRightButton.IsEnabled = selected && _timeline!.CanPlaceSelected(_timeline.SelectedStart + TimeSpan.FromSeconds(.1));
         UndoButton.IsEnabled = _timeline?.CanUndo == true;
         RedoButton.IsEnabled = _timeline?.CanRedo == true;
+        CopyTrackButton.IsEnabled = available && _timeline?.SelectedClips.Count > 0;
+        PasteButton.IsEnabled = PasteTrackButton.IsEnabled = available && _timeline != null;
+        RefreshRangeTools();
         ZoomSlider.IsEnabled = available && hasClips;
+        VoiceButton.IsEnabled = !_loading && !_exporting && hasClips;
+        MicrophoneBox.IsEnabled = available;
+        RefreshProjectTitle();
         UpdatePosition(_position);
     }
 
@@ -393,23 +479,35 @@ public partial class VideoEditorWindow : Window
         TimelineCanvas.UpdateExtent(Math.Max(300, TimelineScroll.ViewportWidth), ZoomSlider.Value);
     }
 
-    bool HasUnexportedChanges() => _timeline is { HasChanges: true } &&
-        (_exportedClips == null || !_timeline.Clips.SequenceEqual(_exportedClips));
+    bool HasUnexportedChanges() => _projectNeedsSave || _timeline != null &&
+        (_savedProjectState.HasValue ? _timeline.StateId != _savedProjectState : _timeline.HasChanges);
 
-    bool ConfirmDiscard() => !HasUnexportedChanges() || MessageBox.Show(this, Loc.Get("EditorDiscard"), Loc.Get("EditorTitle"),
-        MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+    bool ConfirmDiscard()
+    {
+        if (!HasUnexportedChanges()) return true;
+        MessageBoxResult result = AppDialog.ConfirmSave(this);
+        return result == MessageBoxResult.No || result == MessageBoxResult.Yes && SaveProject();
+    }
 
     async void PickSource()
     {
         if (_loading || _exporting) return;
         Pause();
-        var dialog = new OpenFileDialog { Filter = "MP4 (*.mp4)|*.mp4", CheckFileExists = true, Title = Loc.Get("EditorOpen") };
-        if (dialog.ShowDialog(this) == true && ConfirmDiscard()) await LoadAsync(dialog.FileName);
+        var dialog = new OpenFileDialog
+        {
+            Filter = "FrameForge projects / video|*.ffproj;*.mp4;*.mov;*.m4v;*.wmv;*.avi|FrameForge (*.ffproj)|*.ffproj|MP4 (*.mp4)|*.mp4",
+            CheckFileExists = true, Title = Loc.Get("EditorOpenProject")
+        };
+        if (dialog.ShowDialog(this) == true && ConfirmDiscard())
+        {
+            if (string.Equals(Path.GetExtension(dialog.FileName), VideoEditProjectFile.Extension, StringComparison.OrdinalIgnoreCase)) await LoadProjectAsync(dialog.FileName);
+            else await LoadAsync(dialog.FileName);
+        }
     }
 
     async void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (_exporting || _loading || _timeline?.Clips.Count is not > 0 || _sourcePath == null) return;
+        if (_exporting || _loading || _timeline == null || _timeline.Duration <= TimeSpan.Zero || _sourcePath == null || _voiceRecorder != null) return;
         Pause();
         var dialog = new SaveFileDialog
         {
@@ -427,7 +525,7 @@ public partial class VideoEditorWindow : Window
         if (_timeline == null || _sourcePath == null) return;
         _exporting = true;
         _exportCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        VideoEditClip[] snapshot = _timeline.Clips.ToArray();
+        VideoEditSnapshot snapshot = _timeline.Snapshot();
         ExportProgress.Value = 0;
         ExportProgress.Visibility = CancelExportButton.Visibility = Visibility.Visible;
         StatusText.Text = Loc.Format("EditorExporting", 0);
@@ -440,8 +538,7 @@ public partial class VideoEditorWindow : Window
                 ExportProgress.Value = value;
                 StatusText.Text = Loc.Format("EditorExporting", value);
             });
-            await VideoEditorMedia.ExportAsync(_sourcePath, snapshot, destination, progress, _exportCancellation.Token);
-            _exportedClips = snapshot;
+            await VideoEditorMedia.ExportAsync(snapshot, destination, _source!.Width, _source.Height, _source.FrameRate, progress, _exportCancellation.Token);
             StatusText.Text = Loc.Format("EditorExported", destination);
         }
         catch (OperationCanceledException) { StatusText.Text = Loc.Get("EditorCanceled"); }
@@ -462,6 +559,7 @@ public partial class VideoEditorWindow : Window
 
     protected override async void OnClosing(CancelEventArgs e)
     {
+        Pause();
         if (_exporting)
         {
             e.Cancel = true;
@@ -481,6 +579,7 @@ public partial class VideoEditorWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _closed = true;
+        Loc.Changed -= EditorLanguageChanged;
         _previewRevision++;
         _pendingPreviewFrame = null;
         _framePreview = null;
@@ -489,6 +588,7 @@ public partial class VideoEditorWindow : Window
         _timer.Stop();
         _timer.Tick -= Playback_Tick;
         Player.Close();
+        CloseTrackPlayback();
         _waveformCancellation?.Dispose();
         _lifetime.Dispose();
         base.OnClosed(e);
@@ -496,9 +596,18 @@ public partial class VideoEditorWindow : Window
 
     void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (_loading || _exporting || e.OriginalSource is TextBox) return;
+        if (_loading || _exporting) return;
+        if (_voiceRecorder != null) { if (e.Key == Key.Space) { Pause(); e.Handled = true; } return; }
         bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (ctrl && e.Key == Key.S) { SaveProject(shift); e.Handled = true; return; }
+        if (ctrl && e.Key == Key.O) { OpenProject_Click(this, e); e.Handled = true; return; }
+        if (e.OriginalSource is TextBox || e.OriginalSource is System.Windows.Controls.Primitives.Selector) return;
+        if (ctrl && e.Key == Key.C) { if (shift) CopyTrack_Click(this, e); else Copy_Click(this, e); e.Handled = true; return; }
+        if (ctrl && e.Key == Key.V) { if (shift) PasteTrack_Click(this, e); else Paste_Click(this, e); e.Handled = true; return; }
+        if (ctrl && e.Key == Key.X) { Cut_Click(this, e); e.Handled = true; return; }
+        if (e.Key == Key.Escape && TimelineCanvas.HasRange) { TimelineCanvas.ClearRange(); e.Handled = true; return; }
+        if (e.Key == Key.Escape && _frameMode == "crop") { BeginFrameGesture("move"); e.Handled = true; return; }
         if (ctrl && e.Key == Key.B) Split_Click(this, e);
         else if (ctrl && e.Key == Key.Z && shift) Redo_Click(this, e);
         else if (ctrl && e.Key == Key.Z) Undo_Click(this, e);
@@ -524,11 +633,11 @@ public partial class VideoEditorWindow : Window
     void Timeline_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateExtent();
     void Timeline_ScrollChanged(object sender, ScrollChangedEventArgs e) { if (e.ViewportWidthChange != 0) UpdateExtent(); TimelineCanvas.InvalidateVisual(); }
     void Split_Click(object sender, RoutedEventArgs e) { if (_timeline?.Split(_position) == true) AfterEdit(); }
-    void Delete_Click(object sender, RoutedEventArgs e) { if (_timeline?.DeleteSelected() == true) AfterEdit(selectStart: true); }
+    void Delete_Click(object sender, RoutedEventArgs e) { if (TimelineCanvas.HasRange) DeleteRange(copy: false); else if (_timeline?.DeleteSelected() == true) AfterEdit(selectStart: true); }
     void Undo_Click(object sender, RoutedEventArgs e) { if (_timeline?.Undo() == true) AfterEdit(); }
     void Redo_Click(object sender, RoutedEventArgs e) { if (_timeline?.Redo() == true) AfterEdit(); }
-    void MoveLeft_Click(object sender, RoutedEventArgs e) { if (_timeline != null && _timeline.Move(_timeline.SelectedIndex, _timeline.SelectedIndex - 1)) AfterEdit(selectStart: true); }
-    void MoveRight_Click(object sender, RoutedEventArgs e) { if (_timeline != null && _timeline.Move(_timeline.SelectedIndex, _timeline.SelectedIndex + 1)) AfterEdit(selectStart: true); }
+    void MoveLeft_Click(object sender, RoutedEventArgs e) { if (_timeline?.SetSelectedPosition(_timeline.SelectedStart - TimeSpan.FromSeconds(.1)) == true) AfterEdit(selectStart: true); }
+    void MoveRight_Click(object sender, RoutedEventArgs e) { if (_timeline?.SetSelectedPosition(_timeline.SelectedStart + TimeSpan.FromSeconds(.1)) == true) AfterEdit(selectStart: true); }
     void CancelExport_Click(object sender, RoutedEventArgs e) => _exportCancellation?.Cancel();
 
     void Trim_Click(object sender, RoutedEventArgs e)
@@ -536,7 +645,7 @@ public partial class VideoEditorWindow : Window
         if (_timeline == null) return;
         if (!TimeSpan.TryParseExact(TrimInBox.Text, @"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture, out TimeSpan start) ||
             !TimeSpan.TryParseExact(TrimOutBox.Text, @"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture, out TimeSpan end) ||
-            start < TimeSpan.Zero || end > _timeline.SourceDuration || end - start < VideoEditTimeline.MinimumDuration)
+            _timeline.SelectedClip is not { } clip || start < TimeSpan.Zero || end > _timeline.SourceLength(clip) || end - start < VideoEditTimeline.MinimumDuration)
         {
             StatusText.Text = Loc.Get("EditorTrimInvalid");
             return;

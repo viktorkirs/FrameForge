@@ -17,6 +17,10 @@ $group = 'FrameForge Installer Verification ' + [Guid]::NewGuid().ToString('N')
 $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) "$group\FrameForge Recorder.lnk"
 $settings = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'FrameForge\settings.json'
 $settingsBefore = if (Test-Path -LiteralPath $settings) { (Get-FileHash -LiteralPath $settings).Hash } else { '' }
+$projectClass = 'HKCU:\Software\Classes\FrameForge.Project'
+$projectExtension = 'HKCU:\Software\Classes\.ffproj'
+$checkProjectAssociation = -not (Test-Path -LiteralPath $projectClass) -and -not (Test-Path -LiteralPath $projectExtension)
+$taskSelection = if ($checkProjectAssociation) { '!desktopicon,projectassociation' } else { '!desktopicon,!projectassociation' }
 New-Item -ItemType Directory -Path $work -Force | Out-Null
 $results = [Collections.Generic.List[string]]::new()
 
@@ -41,7 +45,7 @@ function Assert([bool]$Condition, [string]$Message) {
     Write-Host ('PASS ' + $Message)
 }
 $common = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOCLOSEAPPLICATIONS', '/SP-')
-$installArgs = $common + @('/LANG=russian', "/DIR=$installed", "/GROUP=$group", '/TASKS=!desktopicon', "/LOG=$work\install.log")
+$installArgs = $common + @('/LANG=russian', "/DIR=$installed", "/GROUP=$group", "/TASKS=$taskSelection", "/LOG=$work\install.log")
 $uninstaller = Join-Path $installed 'unins000.exe'
 $uninstallArgs = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$work\uninstall.log")
 $didInstall = $false
@@ -54,6 +58,10 @@ try {
     $exe = Join-Path $installed 'FrameForge.exe'
     Assert ((Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $uninstaller) -and (Test-Path -LiteralPath (Join-Path $installed 'coreclr.dll'))) 'Recorder, uninstaller and bundled .NET are present'
     Assert (-not (Test-Path -LiteralPath (Join-Path $installed 'portable.marker'))) 'Installed application uses normal user settings'
+    if ($checkProjectAssociation) {
+        $openCommand = (Get-Item -LiteralPath "$projectClass\shell\open\command").GetValue('')
+        Assert ($openCommand -eq ('"' + $exe + '" "%1"')) 'Project association opens .ffproj with a quoted path'
+    }
     $shell = New-Object -ComObject WScript.Shell
     $link = $shell.CreateShortcut($shortcut)
     Assert ((Test-Path -LiteralPath $shortcut) -and $link.TargetPath -eq $exe -and $link.WorkingDirectory -eq $installed) 'Start menu shortcut points to the installed recorder'
@@ -80,7 +88,7 @@ try {
         Assert ($app.ExitCode -eq 0 -and (Get-Content -LiteralPath (Join-Path $probe 'result.txt') -Raw).Contains('SELF-TEST OK')) 'Installed recorder starts and records a valid MP4 with audio'
     } finally { $app.Dispose() }
 
-    $upgrade = Invoke-CheckedProcess $SetupPath ($common + @('/LANG=german', "/DIR=$installed", "/GROUP=$group", '/TASKS=!desktopicon', "/LOG=$work\upgrade.log"))
+    $upgrade = Invoke-CheckedProcess $SetupPath ($common + @('/LANG=german', "/DIR=$installed", "/GROUP=$group", "/TASKS=$taskSelection", "/LOG=$work\upgrade.log"))
     Assert ($upgrade -eq 0 -and (Get-ItemProperty -LiteralPath $registry).DisplayVersion -eq $version) 'Reinstall upgrades in place under the same uninstall identity'
     $guard = [Threading.Mutex]::new($false, 'Local\FrameForge.Recorder.Running')
     try {
@@ -91,6 +99,9 @@ try {
     Assert ($exit -eq 0 -and -not (Test-Path -LiteralPath $exe)) 'Uninstall removes installed application files'
     $didInstall = $false
     Assert (-not (Test-Path -LiteralPath $registry) -and -not (Test-Path -LiteralPath $shortcut)) 'Uninstall removes its registry entry and Start menu shortcut'
+    if ($checkProjectAssociation) {
+        Assert (-not (Test-Path -LiteralPath $projectClass) -and -not (Test-Path -LiteralPath $projectExtension)) 'Uninstall removes only the project association created by this test'
+    }
     Assert ((Test-Path -LiteralPath (Join-Path $installed 'user-note.txt')) -and (Test-Path -LiteralPath (Join-Path $probe 'selftest.mp4'))) 'Uninstall preserves user-created files and recorded videos'
     $settingsAfter = if (Test-Path -LiteralPath $settings) { (Get-FileHash -LiteralPath $settings).Hash } else { '' }
     Assert ($settingsBefore -eq $settingsAfter) 'Existing user settings remain unchanged'

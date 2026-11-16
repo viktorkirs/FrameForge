@@ -65,6 +65,16 @@ internal static partial class Program
                 new VideoEditorWindow(Path.Combine(_output, "editor-source.mp4")).ShowDialog();
                 return 0;
             }
+            if (args.Contains("--editor-microphone"))
+            {
+                RunEditorVoiceCaptureChecks(Path.Combine(_output, "editor-source.mp4"));
+                return 0;
+            }
+            if (args.Contains("--editor-tracks"))
+            {
+                RunEditorTrackMediaTests(Path.Combine(_output, "editor-source.mp4"), Path.Combine(_output, "editor-silent.mp4"));
+                return 0;
+            }
             if (args.Contains("--editor"))
             {
                 RunVideoEditorTests();

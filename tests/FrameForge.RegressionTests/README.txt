@@ -7,12 +7,20 @@ Requires Windows, .NET 10 SDK, an interactive desktop and a connected monitor.
 The --capture checks additionally require a working hardware H.264 encoder.
 Without --capture, the shutdown check still makes a short recording with automatic encoder selection.
 Use --headless for CI checks that require no WPF desktop, GPU capture or audio device.
-The headless checks include montage source-time mapping, trimming, reordering and undo/redo.
+The headless checks include source-time mapping, independent trimming/movement, ranges,
+clip/track copy-paste, old-project migration and undo/redo.
 Use --editor for synthetic linked video/audio montage export, silent MP4s, waveform decoding,
 export cancellation/source preservation, paused preview scrubbing and translated editor layouts.
 Editor checks also cover hover cursors, highlighted/enlarged handles, per-frame source mapping
 after trimming, rapid seek requests and the exclusive out point of a clip.
 These checks need Windows media codecs and WPF, but do not capture the desktop or microphone.
+They also verify multiple sources/layers, delayed voice mixing, encoded crop/rotation/translation,
+alpha fades, portrait output, capture-frame hiding/restoration and .ffproj save/resume.
+Workspace checks cover black/silent gaps in actual exports, Ctrl+wheel horizontal scrolling,
+compact row alignment, both splitters, themed dialog cancellation and switching without losing edits.
+Project round-trips, relative path relocation, invalid-file preservation and track history also run headlessly.
+After --editor, --editor-microphone records two short microphone takes while the synthetic video plays
+and checks their timeline positions and automatic stopping. WAV fixtures stay in the verification folder.
 After --editor, --editor-preview opens its synthetic recording for manual mouse/keyboard checks.
 Use --updates for update-notification UI, download actions and offline/cancellation checks using
 fake HTTP responses. Manifest parsing and HTTP checks also run under --headless, without network access.

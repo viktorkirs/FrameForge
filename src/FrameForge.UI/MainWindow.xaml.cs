@@ -57,6 +57,10 @@ public partial class MainWindow : Window
         IsEnabled = false;
         try
         {
+            if (!await _model.CloseEditorAsync())
+            {
+                _closing = false; IsEnabled = true; return;
+            }
             await _model.ShutdownAsync();
         }
         catch (Exception ex)
@@ -65,8 +69,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            _canClose = true;
-            Close();
+            if (_closing) { _canClose = true; Close(); }
         }
     }
 

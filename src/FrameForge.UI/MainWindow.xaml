@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:FrameForge.UI"
         Title="FrameForge Recorder"
         Width="760"
-        Height="680"
+        Height="740"
         MinWidth="680"
         MinHeight="600"
         WindowStartupLocation="CenterScreen"
@@ -20,6 +20,7 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Assets/Icons.xaml"/>
+        <ResourceDictionary Source="Assets/EditorIcons.xaml"/>
       </ResourceDictionary.MergedDictionaries>
       <!-- Indeterminate on purpose: Media Foundation finalize has no percent. -->
       <Style x:Key="FinishBar" TargetType="ProgressBar">
@@ -89,11 +90,6 @@
           <TextBlock Text="Recorder" Margin="8,0,0,0" Foreground="{StaticResource MutedBrush}" FontSize="13" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-          <Button Style="{StaticResource IconButton}" Command="{Binding EditVideoCommand}"
-                  ToolTip="{Binding [EditVideo], Source={x:Static local:TextTable.Instance}}"
-                  AutomationProperties.Name="{Binding [EditVideo], Source={x:Static local:TextTable.Instance}}">
-            <TextBlock Text="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="16"/>
-          </Button>
           <Button Style="{StaticResource IconButton}" Command="{Binding AboutCommand}"
                   ToolTip="{Binding [About], Source={x:Static local:TextTable.Instance}}"
                   AutomationProperties.Name="{Binding [About], Source={x:Static local:TextTable.Instance}}">
@@ -110,6 +106,14 @@
       </Grid>
 
       <DockPanel Grid.Row="1">
+      <UniformGrid DockPanel.Dock="Top" Columns="2" Margin="0,10,0,0">
+        <Button x:Name="RecordingWorkspaceButton" Style="{StaticResource ModeButton}" Height="46" Margin="0,0,5,0" Tag="Selected" Command="{Binding RecordingWorkspaceCommand}">
+          <StackPanel Orientation="Horizontal"><Image Source="{StaticResource EditorIconVideo}" Width="20" Height="20" Margin="0,0,9,0"/><TextBlock Text="{Binding [WorkspaceRecording], Source={x:Static local:TextTable.Instance}}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+        </Button>
+        <Button x:Name="EditorWorkspaceButton" Style="{StaticResource ModeButton}" Height="46" Margin="5,0,0,0" Command="{Binding EditVideoCommand}">
+          <StackPanel Orientation="Horizontal"><Image Source="{StaticResource EditorIconEditor}" Width="20" Height="20" Margin="0,0,9,0"/><TextBlock Text="{Binding [WorkspaceEditor], Source={x:Static local:TextTable.Instance}}" VerticalAlignment="Center" FontSize="15"/></StackPanel>
+        </Button>
+      </UniformGrid>
       <Border x:Name="UpdateNotice" DockPanel.Dock="Top" DataContext="{Binding Updates}" Margin="0,10,0,0" Padding="12,9"
               Background="#FF243B5B" CornerRadius="8" Visibility="{Binding ShowNotice, Converter={StaticResource BoolToVis}}">
         <Grid>

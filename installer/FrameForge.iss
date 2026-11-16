@@ -41,6 +41,7 @@ AppMutex=Local\FrameForge.Recorder.Running
 SetupMutex=Local\FrameForge.Setup
 CloseApplications=no
 RestartApplications=no
+ChangesAssociations=yes
 OutputDir={#InstallerOutputDir}
 OutputBaseFilename=FrameForge-Setup-{#AppVersion}-x64
 Compression=lzma2/max
@@ -64,6 +65,7 @@ Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "projectassociation"; Description: "Associate .ffproj files with FrameForge"; GroupDescription: "FrameForge projects"
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,portable.marker,data\*,artifacts\*"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -72,6 +74,13 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}"; Excludes: "*.pdb,portable.marker,da
 Name: "{group}\FrameForge Recorder"; Filename: "{app}\FrameForge.exe"; WorkingDir: "{app}"; AppUserModelID: "FrameForge.Recorder"
 Name: "{group}\{cm:UninstallProgram,FrameForge Recorder}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\FrameForge Recorder"; Filename: "{app}\FrameForge.exe"; WorkingDir: "{app}"; Tasks: desktopicon; AppUserModelID: "FrameForge.Recorder"
+
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\.ffproj"; ValueType: string; ValueData: "FrameForge.Project"; Tasks: projectassociation; Flags: createvalueifdoesntexist uninsdeletevalue uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\Classes\.ffproj\OpenWithProgids"; ValueType: string; ValueName: "FrameForge.Project"; ValueData: ""; Tasks: projectassociation; Flags: uninsdeletevalue uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\Classes\FrameForge.Project"; ValueType: string; ValueData: "FrameForge video project"; Tasks: projectassociation; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\FrameForge.Project\DefaultIcon"; ValueType: string; ValueData: "{app}\FrameForge.exe,0"; Tasks: projectassociation
+Root: HKCU; Subkey: "Software\Classes\FrameForge.Project\shell\open\command"; ValueType: string; ValueData: """{app}\FrameForge.exe"" ""%1"""; Tasks: projectassociation
 
 [Run]
 Filename: "{app}\FrameForge.exe"; Description: "{cm:LaunchProgram,FrameForge Recorder}"; Flags: nowait postinstall skipifsilent

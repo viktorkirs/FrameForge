@@ -18,7 +18,7 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             Log.Error("Необработанное исключение интерфейса.", args.Exception);
-            MessageBox.Show(args.Exception.Message, "FrameForge Recorder", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowError(MainWindow, args.Exception.Message, "FrameForge Recorder");
             args.Handled = true;
         };
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
@@ -46,6 +46,9 @@ public partial class App : Application
         var window = new MainWindow();
         MainWindow = window;
         window.Show();
+        string? projectPath = e.Args.FirstOrDefault(arg => string.Equals(Path.GetExtension(arg), VideoEditProjectFile.Extension, StringComparison.OrdinalIgnoreCase));
+        if (projectPath != null)
+            window.Dispatcher.BeginInvoke(() => (window.DataContext as MainViewModel)?.OpenVideoProject(Path.GetFullPath(projectPath)));
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         base.OnStartup(e);
     }
