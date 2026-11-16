@@ -41,7 +41,7 @@ public sealed partial class VideoEditTimeline
             Transform = kind == VideoEditClipKind.Image ? new() { Scale = .5 } : new()
         };
         var track = new VideoEditTrack(Guid.NewGuid(), VideoEditTrackKind.Video, name, [clip]);
-        _tracks.Add(track); SelectedTrackId = track.Id; SelectedIndex = 0;
+        _tracks.Add(track); _layerOrder.Insert(0, track.Id); SelectedTrackId = track.Id; SelectedIndex = 0;
         return track.Id;
     }
 

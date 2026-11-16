@@ -52,6 +52,10 @@ lanes compact, while the separate zoom slider changes the time scale. Drag the s
 space to the preview/timeline or resize the tools panel. The arrow buttons scroll horizontally and
 **Fit** fits the whole project into view.
 
+Drag the dotted grip beside a track name up or down to change layer order. The upper track appears
+in front in both preview and export. New layers start at the top; the main video and its linked sound
+move together. A line marks the destination. Escape cancels the drag; undo/redo also restore layer order.
+
 Drag across the ruler (or Shift+drag) to select one time range across every lane. **Cut range** (`Ctrl+X`)
 copies and removes that zone without shifting later clips; Delete removes it without copying.
 `Ctrl+C` / `Ctrl+V` copy and paste clips or ranges at the playhead. **Copy track / Paste track**
@@ -83,7 +87,7 @@ The preview and exported MP4 use the same format; scale and reposition individua
 
 **Save project** (`Ctrl+S`) writes an editable `.ffproj`; `Ctrl+Shift+S` saves a copy and `Ctrl+O` opens one.
 Projects retain clips, layers, transforms, fades, volumes, canvas format, playhead and timeline zoom.
-Version-three projects retain editable text and image layers. Version-one and version-two projects migrate on load.
+Version-four projects retain layer order, editable text and image layers. Older projects migrate on load.
 Text and its formatting are stored inside the project. Projects reference the original video, audio and
 image files rather than embedding them. Keep those files with the
 project when moving it; relative paths let a project folder move together. If media is missing,

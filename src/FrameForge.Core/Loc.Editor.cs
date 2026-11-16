@@ -6,6 +6,7 @@ public static partial class Loc
     {
         (string Key, string English, string German, string Russian)[] entries =
         [
+            ("EditorReorderTrack", "Drag to reorder layers. Upper tracks appear in front.", "Ziehen, um Ebenen anzuordnen. Obere Spuren liegen vorn.", "Тяните, чтобы менять порядок слоёв. Верхняя дорожка отображается поверх нижней."),
             ("EditorAddImage", "Add image", "Bild hinzufügen", "Добавить изображение"),
             ("EditorAddText", "Add text", "Text hinzufügen", "Добавить текст"),
             ("EditorImageLayer", "Image", "Bild", "Изображение"),

@@ -201,7 +201,7 @@ public sealed class RegionWindow : Window
         var window = new RegionWindow(current, monitor);
         if (owner != null && owner.WindowState != WindowState.Minimized)
             window.Owner = owner;
-        bool accepted = window.ShowDialog() == true && !window.Result.IsEmpty;
+        bool accepted = ModalBackdrop.ShowDialog(window) == true && !window.Result.IsEmpty;
         rect = window.Result;
         return accepted;
     }

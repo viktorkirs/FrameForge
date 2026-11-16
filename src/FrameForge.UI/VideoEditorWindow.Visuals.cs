@@ -80,9 +80,9 @@ public partial class VideoEditorWindow
     {
         if (_timeline == null) return;
         TimelineVertical.UpdateLayout();
-        int index = _timeline.Tracks.ToList().FindIndex(track => track.Id == _timeline.SelectedTrackId);
-        double top = index < 0 ? 0 : TimelineCanvas.LaneY(176 + index * 64);
-        double bottom = TimelineCanvas.LaneY(index < 0 ? 164 : 240 + index * 64);
+        double raw = TimelineCanvas.TrackTop(_timeline.SelectedTrackId);
+        double top = TimelineCanvas.LaneY(raw);
+        double bottom = TimelineCanvas.LaneY(raw + (_timeline.SelectedTrackId == null ? 150 : 64));
         if (top < TimelineVertical.VerticalOffset) TimelineVertical.ScrollToVerticalOffset(top);
         else if (bottom > TimelineVertical.VerticalOffset + TimelineVertical.ViewportHeight)
             TimelineVertical.ScrollToVerticalOffset(bottom - TimelineVertical.ViewportHeight);
@@ -102,7 +102,7 @@ public partial class VideoEditorWindow
         if (_loading || _exporting || _voiceRecorder != null) return;
         Pause();
         var dialog = new OpenFileDialog { Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff", Multiselect = true, Title = Loc.Get("EditorAddImage") };
-        if (dialog.ShowDialog(this) != true) return;
+        if (ModalBackdrop.ShowDialog(dialog, this) != true) return;
         try { foreach (string path in dialog.FileNames) AddImageSource(path, _position); AfterEdit(selectStart: true); }
         catch (Exception ex) { if (_timeline != null) AfterEdit(selectStart: true); StatusText.Text = ex.Message; Log.Error("Importing editor image.", ex); RefreshControls(); }
     }

@@ -32,7 +32,7 @@ public partial class VideoEditorWindow
                 InitialDirectory = Path.GetDirectoryName(_projectPath ?? _sourcePath),
                 FileName = (Path.GetFileNameWithoutExtension(_projectPath ?? _sourcePath) ?? "Project") + VideoEditProjectFile.Extension
             };
-            if (dialog.ShowDialog(this) != true) return false;
+            if (ModalBackdrop.ShowDialog(dialog, this) != true) return false;
             path = dialog.FileName;
         }
         return SaveProjectTo(path);
@@ -58,7 +58,7 @@ public partial class VideoEditorWindow
         if (_loading || _exporting || _voiceRecorder != null) return;
         Pause();
         var dialog = new OpenFileDialog { Filter = "FrameForge project (*.ffproj)|*.ffproj", CheckFileExists = true, Title = Loc.Get("EditorOpenProject") };
-        if (dialog.ShowDialog(this) == true && ConfirmDiscard()) await LoadProjectAsync(dialog.FileName);
+        if (ModalBackdrop.ShowDialog(dialog, this) == true && ConfirmDiscard()) await LoadProjectAsync(dialog.FileName);
     }
 
     void SaveProject_Click(object sender, RoutedEventArgs e) => SaveProject();
@@ -88,7 +88,7 @@ public partial class VideoEditorWindow
                         Title = Loc.Format("EditorLocateMedia", Path.GetFileName(source)), FileName = Path.GetFileName(source),
                         Filter = "Media|*.mp4;*.mov;*.m4v;*.wmv;*.avi;*.wav;*.mp3;*.flac;*.m4a;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|All files|*.*", CheckFileExists = true
                     };
-                    if (dialog.ShowDialog(this) != true) throw new FileNotFoundException(Loc.Format("EditorMissingMedia", source));
+                    if (ModalBackdrop.ShowDialog(dialog, this) != true) throw new FileNotFoundException(Loc.Format("EditorMissingMedia", source));
                     sourcePath = Path.GetFullPath(dialog.FileName); relinked = true;
                 }
                 replacements[source] = sourcePath;

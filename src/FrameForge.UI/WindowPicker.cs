@@ -213,7 +213,7 @@ public sealed class WindowPicker : Window
         var dialog = new WindowPicker(WindowCatalog.VisibleWindows());
         if (owner != null)
             dialog.Owner = owner;
-        bool accepted = dialog.ShowDialog() == true && dialog.Choice != null;
+        bool accepted = ModalBackdrop.ShowDialog(dialog) == true && dialog.Choice != null;
         choice = dialog.Choice!;
         return accepted;
     }

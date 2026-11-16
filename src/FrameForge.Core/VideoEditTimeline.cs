@@ -52,6 +52,9 @@ public sealed record VideoFrameTransform
 public sealed record VideoEditSnapshot(string? SourcePath, TimeSpan SourceDuration,
     IReadOnlyList<VideoEditClip> Clips, IReadOnlyList<VideoEditTrack> Tracks, bool MainMuted)
 {
+    /// <summary>Front to back; Guid.Empty identifies the linked main video/audio lane.</summary>
+    public IReadOnlyList<Guid> LayerOrder { get; init; } = [];
+    public IEnumerable<Guid> OrderedTrackIds => LayerOrder.Count > 0 ? LayerOrder : Tracks.Select(track => track.Id).Append(Guid.Empty);
     public TimeSpan MainDuration => TimeSpan.FromTicks(Clips.Select(clip => (clip.Position + clip.Duration).Ticks).DefaultIfEmpty(0).Max());
     public TimeSpan Duration => TimeSpan.FromTicks(Math.Max(MainDuration.Ticks,
         Tracks.SelectMany(track => track.Clips).Select(clip => (clip.Position + clip.Duration).Ticks).DefaultIfEmpty(0).Max()));
@@ -63,6 +66,7 @@ public sealed partial class VideoEditTimeline
     public static readonly TimeSpan MinimumDuration = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 30);
     readonly List<VideoEditClip> _clips = [];
     readonly List<VideoEditTrack> _tracks = [];
+    readonly List<Guid> _layerOrder = [Guid.Empty];
     readonly Stack<State> _undo = new();
     readonly Stack<State> _redo = new();
     readonly record struct State(VideoEditSnapshot Snapshot, int SelectedIndex, Guid? SelectedTrackId, Guid Id);
@@ -77,12 +81,14 @@ public sealed partial class VideoEditTimeline
         _clips.Add(new VideoEditClip(Guid.NewGuid(), TimeSpan.Zero, sourceDuration) { SourcePath = sourcePath, OriginalDuration = sourceDuration });
         Clips = _clips.AsReadOnly();
         Tracks = _tracks.AsReadOnly();
+        LayerOrder = _layerOrder.AsReadOnly();
     }
 
     public IReadOnlyList<VideoEditClip> Clips { get; }
     public TimeSpan SourceDuration { get; }
     public string? SourcePath { get; }
     public IReadOnlyList<VideoEditTrack> Tracks { get; }
+    public IReadOnlyList<Guid> LayerOrder { get; }
     public bool MainMuted { get; private set; }
     public Guid StateId { get; private set; }
     public TimeSpan MainDuration => TimeSpan.FromTicks(_clips.Select(clip => (clip.Position + clip.Duration).Ticks).DefaultIfEmpty(0).Max());
@@ -100,13 +106,14 @@ public sealed partial class VideoEditTimeline
     public TimeSpan StartOf(int index) => index >= 0 && index < _clips.Count ? _clips[index].Position : MainDuration;
     public TimeSpan SelectedStart => SelectedTrackId == null ? StartOf(SelectedIndex) : SelectedClip?.Position ?? TimeSpan.Zero;
     public TimeSpan SourceLength(VideoEditClip clip) => clip.OriginalDuration > TimeSpan.Zero ? clip.OriginalDuration : SourceDuration;
-    public VideoEditSnapshot Snapshot() => new(SourcePath, SourceDuration, _clips.ToArray(), _tracks.ToArray(), MainMuted);
+    public VideoEditSnapshot Snapshot() => new(SourcePath, SourceDuration, _clips.ToArray(), _tracks.ToArray(), MainMuted) { LayerOrder = _layerOrder.ToArray() };
 
     public static VideoEditTimeline FromSnapshot(VideoEditSnapshot snapshot)
     {
         var timeline = new VideoEditTimeline(snapshot.SourceDuration, snapshot.SourcePath);
         timeline._clips.Clear(); timeline._clips.AddRange(snapshot.Clips);
         timeline._tracks.AddRange(snapshot.Tracks);
+        timeline._layerOrder.Clear(); timeline._layerOrder.AddRange(snapshot.OrderedTrackIds);
         timeline.MainMuted = snapshot.MainMuted;
         timeline.SelectedIndex = timeline.Clips.Count > 0 ? 0 : -1;
         return timeline;
@@ -179,6 +186,7 @@ public sealed partial class VideoEditTimeline
         Remember();
         var track = new VideoEditTrack(Guid.NewGuid(), kind, name, Array.Empty<VideoEditClip>());
         _tracks.Add(track);
+        _layerOrder.Insert(0, track.Id);
         SelectedTrackId = track.Id;
         SelectedIndex = -1;
         return track.Id;
@@ -189,6 +197,7 @@ public sealed partial class VideoEditTimeline
         if (SelectedTrack == null) return false;
         Remember();
         _tracks.RemoveAll(track => track.Id == SelectedTrackId);
+        _layerOrder.Remove(SelectedTrackId!.Value);
         SelectedTrackId = null;
         SelectedIndex = _clips.Count > 0 ? 0 : -1;
         return true;
@@ -202,6 +211,14 @@ public sealed partial class VideoEditTimeline
         if (track == null) MainMuted = !MainMuted;
         else ReplaceTrack(track with { Muted = !track.Muted });
         return true;
+    }
+
+    public bool MoveTrack(Guid? trackId, int destination)
+    {
+        Guid id = trackId ?? Guid.Empty;
+        int index = _layerOrder.IndexOf(id);
+        if (index < 0 || destination < 0 || destination >= _layerOrder.Count || index == destination) return false;
+        Remember(); _layerOrder.RemoveAt(index); _layerOrder.Insert(destination, id); return true;
     }
 
     public bool AddSource(string path, TimeSpan duration, TimeSpan position, VideoEditTrackKind kind)
@@ -321,6 +338,7 @@ public sealed partial class VideoEditTimeline
         _clips.AddRange(state.Snapshot.Clips);
         _tracks.Clear();
         _tracks.AddRange(state.Snapshot.Tracks);
+        _layerOrder.Clear(); _layerOrder.AddRange(state.Snapshot.OrderedTrackIds);
         MainMuted = state.Snapshot.MainMuted;
         SelectedIndex = state.SelectedIndex;
         SelectedTrackId = state.SelectedTrackId;

@@ -6,7 +6,7 @@ namespace FrameForge.Core;
 public sealed record VideoEditProject(VideoEditSnapshot Timeline, uint Width, uint Height, double FrameRate)
 {
     public string Format { get; init; } = "FrameForgeProject";
-    public int Version { get; init; } = 3;
+    public int Version { get; init; } = 4;
     public TimeSpan Playhead { get; init; }
     public double Zoom { get; init; } = 1;
     public double TrackHeightScale { get; init; } = 1;
@@ -26,7 +26,7 @@ public static class VideoEditProjectFile
     public static void Save(string path, VideoEditProject project)
     {
         Validate(project);
-        if (project.Version != 3) throw new InvalidDataException(Loc.Get("EditorProjectInvalid"));
+        if (project.Version != 4) throw new InvalidDataException(Loc.Get("EditorProjectInvalid"));
         string destination = Path.GetFullPath(path);
         if (!string.Equals(Path.GetExtension(destination), Extension, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException(Loc.Get("EditorProjectExtension"));
@@ -65,7 +65,8 @@ public static class VideoEditProjectFile
                 project = project with { Version = 2, Timeline = project.Timeline with { Clips = positioned } };
                 Validate(project);
             }
-            project = project with { Version = 3 };
+            if (project.Version < 4) project = project with { Timeline = project.Timeline with { LayerOrder = project.Timeline.Tracks.Select(track => track.Id).Append(Guid.Empty).ToArray() } };
+            project = project with { Version = 4 };
             string directory = Path.GetDirectoryName(fullPath)!;
             return MapPaths(project, source => Path.GetFullPath(source, directory));
         }
@@ -94,7 +95,7 @@ public static class VideoEditProjectFile
 
     public static void Validate(VideoEditProject project)
     {
-        if (project.Format != "FrameForgeProject" || project.Version is not (1 or 2 or 3) || project.Timeline is not { } snapshot ||
+        if (project.Format != "FrameForgeProject" || project.Version is not (1 or 2 or 3 or 4) || project.Timeline is not { } snapshot ||
             project.Width is < 2 or > 16384 || project.Height is < 2 or > 16384 || project.Width % 2 != 0 || project.Height % 2 != 0 ||
             !double.IsFinite(project.FrameRate) || project.FrameRate is < 1 or > 120 || project.Playhead < TimeSpan.Zero ||
             !double.IsFinite(project.Zoom) || project.Zoom is < .1 or > 24 || !double.IsFinite(project.TrackHeightScale) ||
@@ -106,6 +107,9 @@ public static class VideoEditProjectFile
             snapshot.Tracks.Select(track => track.Id).Distinct().Count() != snapshot.Tracks.Count)
             throw new InvalidDataException(Loc.Get("EditorProjectInvalid"));
         VideoEditClip[] clips = snapshot.Clips.Concat(snapshot.Tracks.SelectMany(track => track.Clips)).ToArray();
+        if (snapshot.LayerOrder == null || snapshot.LayerOrder.Count > 0 && (snapshot.LayerOrder.Count != snapshot.Tracks.Count + 1 ||
+            snapshot.LayerOrder.Distinct().Count() != snapshot.LayerOrder.Count || !snapshot.LayerOrder.Contains(Guid.Empty) ||
+            snapshot.Tracks.Any(track => !snapshot.LayerOrder.Contains(track.Id)))) throw new InvalidDataException(Loc.Get("EditorProjectInvalid"));
         if (clips.Length > 10000 || clips.Any(clip => clip == null || clip.Id == Guid.Empty ||
             !clip.HasValidVisual || clip.Kind != VideoEditClipKind.Text && string.IsNullOrWhiteSpace(clip.SourcePath ?? snapshot.SourcePath) || clip.Start < TimeSpan.Zero ||
             clip.OriginalDuration < VideoEditTimeline.MinimumDuration || clip.OriginalDuration > TimeSpan.FromDays(7) ||

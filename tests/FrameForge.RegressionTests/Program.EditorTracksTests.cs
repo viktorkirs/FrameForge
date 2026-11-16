@@ -121,6 +121,7 @@ internal static partial class Program
         RunEditorProjectMediaTests(source, silent);
         RunEditorWorkspaceUiTests(source);
         RunEditorVisualMediaTests(source, silent, wave);
+        RunEditorLayerOrderMediaTests(source, silent);
     }
 
     static void CreateEditorPattern(string path)

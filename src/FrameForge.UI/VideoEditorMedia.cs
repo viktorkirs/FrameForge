@@ -204,14 +204,16 @@ public static class VideoEditorMedia
             }
         }
 
-        var main = new MediaOverlayLayer();
-        foreach (VideoEditClip clip in snapshot.Clips)
+        foreach (Guid id in snapshot.OrderedTrackIds.Reverse())
         {
-            await AddVideo(clip, clip.Position, main, snapshot.MainMuted);
-        }
-        if (main.Overlays.Count > 0) composition.OverlayLayers.Add(main);
-        foreach (VideoEditTrack track in snapshot.Tracks)
-        {
+            if (id == Guid.Empty)
+            {
+                var main = new MediaOverlayLayer();
+                foreach (VideoEditClip clip in snapshot.Clips) await AddVideo(clip, clip.Position, main, snapshot.MainMuted);
+                if (main.Overlays.Count > 0) composition.OverlayLayers.Add(main);
+                continue;
+            }
+            VideoEditTrack track = snapshot.Tracks.First(track => track.Id == id);
             if (track.Kind == VideoEditTrackKind.Video)
             {
                 var layer = new MediaOverlayLayer();

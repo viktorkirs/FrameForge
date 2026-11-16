@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0
+
+- Use one explicit front-to-back layer order for timeline rows, paused/playing preview and MP4 export.
+  Fix upper image/text layers being obscured by video tracks created later. New layers start in front.
+- Drag the grip beside a track name up or down, including the linked main video/audio track.
+  Show an insertion marker, scroll long track lists near the edges, and support cancel, undo and redo.
+- Save layer order in version-four projects and migrate older projects with the main recording as
+  their background. Reordering does not move, trim or replace any clip.
+- Add dark frosted-glass backdrops for modal windows and native file/folder dialogs. Dim and blur
+  the owner chain, retain shading for nested modals, and restore it after closing or canceling.
+
 ## 1.6.0
 
 - Add image layers, including PNG transparency, with independent timing, preview handles,

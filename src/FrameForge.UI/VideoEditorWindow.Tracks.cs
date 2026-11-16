@@ -46,6 +46,7 @@ public partial class VideoEditorWindow
 
     void InitializeTracks()
     {
+        Closed += (_, _) => _trackReorderScroll?.Stop();
         var microphones = new List<AudioDeviceInfo> { new("", Loc.Get("EditorDefaultMicrophone")) };
         microphones.AddRange(AudioDeviceCatalog.GetMicrophones());
         MicrophoneBox.ItemsSource = microphones;
@@ -132,10 +133,12 @@ public partial class VideoEditorWindow
     void SyncTrackPlayback(bool force = false)
     {
         if (_timeline == null || _closed) return;
+        ApplyBaseLayerOrder();
         foreach (VideoEditTrack track in _timeline.Tracks)
         {
             if (!_trackPlayers.TryGetValue(track.Id, out TrackPreview? preview))
                 _trackPlayers.Add(track.Id, preview = CreateTrackPreview(track));
+            ApplyLayerOrder(track.Id, preview.Player, preview.Still);
             TimeSpan at = _position >= _timeline.Duration && _timeline.Duration > TimeSpan.Zero ? _position - TimeSpan.FromTicks(1) : _position;
             VideoEditClip? clip = track.Clips.FirstOrDefault(clip => at >= clip.Position && at < clip.Position + clip.Duration);
             if (clip == null)
@@ -252,9 +255,10 @@ public partial class VideoEditorWindow
         void Header(Guid? id, string label, double top, bool muted, bool hasAudio = true)
         {
             var panel = new StackPanel { Width = 101, Orientation = Orientation.Horizontal, Margin = new Thickness(2, 0, 2, 0) };
+            panel.Children.Add(CreateTrackGrip(id));
             var select = new Button
             {
-                Content = new TextBlock { Text = label, TextTrimming = TextTrimming.CharacterEllipsis }, Width = 78,
+                Content = new TextBlock { Text = label, TextTrimming = TextTrimming.CharacterEllipsis }, Width = 66,
                 FontSize = 10, Padding = new Thickness(3, 4, 3, 4), ToolTip = label,
                 Background = id == _timeline.SelectedTrackId ? (Brush)FindResource("CardHoverBrush") : Brushes.Transparent,
                 Foreground = (Brush)FindResource("TextBrush"), BorderThickness = new Thickness(0)
@@ -280,16 +284,18 @@ public partial class VideoEditorWindow
             Canvas.SetTop(panel, TimelineCanvas.LaneY(top));
             TrackHeaders.Children.Add(panel);
         }
-        Header(null, Loc.Get("EditorVideoTrack") + " 1", 37, _timeline.MainMuted);
+        Header(null, Loc.Get("EditorVideoTrack") + " 1", TimelineCanvas.TrackTop(null) + 5, _timeline.MainMuted);
         var audioLabel = new TextBlock { Text = Loc.Get("EditorAudioTrack"), FontSize = 10, Foreground = Brushes.MediumAquamarine, Margin = new Thickness(9, 0, 0, 0) };
-        Canvas.SetTop(audioLabel, TimelineCanvas.LaneY(120));
+        Canvas.SetTop(audioLabel, TimelineCanvas.LaneY(TimelineCanvas.TrackTop(null) + 88));
         TrackHeaders.Children.Add(audioLabel);
         for (int i = 0; i < _timeline.Tracks.Count; i++)
         {
             VideoEditTrack track = _timeline.Tracks[i];
-            Header(track.Id, track.Name, 182 + i * 64, track.Muted, track.Kind == VideoEditTrackKind.Audio || track.Clips.Any(clip => !clip.IsStill));
+            Header(track.Id, track.Name, TimelineCanvas.TrackTop(track.Id) + 6, track.Muted, track.Kind == VideoEditTrackKind.Audio || track.Clips.Any(clip => !clip.IsStill));
         }
         TimelineCanvas.UpdateLaneHeight(); TrackHeaders.Height = TimelineCanvas.Height;
+        ApplyBaseLayerOrder();
+        foreach (var entry in _trackPlayers) ApplyLayerOrder(entry.Key, entry.Value.Player, entry.Value.Still);
         UpdatePreviewLayout();
     }
 
@@ -425,7 +431,7 @@ public partial class VideoEditorWindow
         if (_loading || _exporting || _voiceRecorder != null) return;
         Pause();
         var dialog = new OpenFileDialog { Filter = "Video (*.mp4;*.mov;*.m4v;*.wmv;*.avi)|*.mp4;*.mov;*.m4v;*.wmv;*.avi", Multiselect = true, Title = Loc.Get("EditorAddVideo") };
-        if (dialog.ShowDialog(this) != true) return;
+        if (ModalBackdrop.ShowDialog(dialog, this) != true) return;
         string[] files = dialog.FileNames;
         if (_timeline == null) { await LoadAsync(files[0]); if (_timeline == null) return; files = files.Skip(1).ToArray(); }
         if (_timeline.SelectedTrack?.Kind == VideoEditTrackKind.Audio) _timeline.SelectedTrackId = null;
@@ -461,7 +467,7 @@ public partial class VideoEditorWindow
         if (_loading || _exporting || _voiceRecorder != null) return;
         Pause();
         var dialog = new OpenFileDialog { Filter = "Audio (*.wav;*.mp3;*.flac;*.m4a)|*.wav;*.mp3;*.flac;*.m4a", Multiselect = true, Title = Loc.Get("EditorAddAudio") };
-        if (dialog.ShowDialog(this) != true) return;
+        if (ModalBackdrop.ShowDialog(dialog, this) != true) return;
         _loading = true; RefreshControls();
         try
         {

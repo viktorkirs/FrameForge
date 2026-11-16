@@ -52,6 +52,23 @@ public sealed class VideoTimelineControl : FrameworkElement
     public TimeSpan? RangeEnd { get; private set; }
     public bool HasRange => RangeStart != null && RangeEnd - RangeStart >= VideoEditTimeline.MinimumDuration;
     public double LaneY(double y) => 32 + (y - 32) * TrackHeightScale;
+    public double? TrackInsertionY { get; set; }
+    public double TrackTop(Guid? id)
+    {
+        double top = 32;
+        if (Timeline == null) return top;
+        foreach (Guid item in Timeline.LayerOrder)
+        { if (item == (id ?? Guid.Empty)) return top; top += item == Guid.Empty ? 150 : 64; }
+        return top;
+    }
+    public int TrackOrderAt(double y)
+    {
+        double raw = 32 + (y - 32) / TrackHeightScale, top = 32;
+        if (Timeline == null) return 0;
+        for (int i = 0; i < Timeline.LayerOrder.Count; i++)
+        { top += Timeline.LayerOrder[i] == Guid.Empty ? 150 : 64; if (raw < top) return i; }
+        return Math.Max(0, Timeline.LayerOrder.Count - 1);
+    }
     public void UpdateLaneHeight() => Height = LaneY(182 + (Timeline?.Tracks.Count ?? 0) * 64);
     public void FitToContent() => _fitSeconds = Math.Max(1, Timeline?.Duration.TotalSeconds ?? 1) * 1.12 + .5;
     public void ClearRange() { RangeStart = RangeEnd = null; RangeChanged?.Invoke(); InvalidateVisual(); }
@@ -99,6 +116,7 @@ public sealed class VideoTimelineControl : FrameworkElement
         _drawingLanes = true;
         if (Timeline != null)
         {
+            dc.PushTransform(new TranslateTransform(0, TrackTop(null) - 32));
             for (int index = 0; index < Timeline.Clips.Count; index++)
             {
                 VideoEditClip clip = Timeline.Clips[index];
@@ -112,10 +130,11 @@ public sealed class VideoTimelineControl : FrameworkElement
                 if (x + width >= visibleLeft && x <= visibleRight)
                     DrawClip(dc, clip, index, x, width, visibleLeft, visibleRight);
             }
+            dc.Pop();
             for (int lane = 0; lane < Timeline.Tracks.Count; lane++)
             {
                 VideoEditTrack track = Timeline.Tracks[lane];
-                double y = 182 + lane * 64;
+                double y = TrackTop(track.Id);
                 dc.DrawLine(new Pen(Brush("#343C4E"), .6), new Point(0, y), new Point(ActualWidth, y));
                 if (track.Clips.Count == 0) Text(dc, Loc.Get("EditorEmptyTrack"), visibleLeft + 16, y + 23, MutedBrush, 11);
                 for (int index = 0; index < track.Clips.Count; index++)
@@ -133,6 +152,8 @@ public sealed class VideoTimelineControl : FrameworkElement
         }
         _drawingLanes = false;
         dc.Pop();
+        if (TrackInsertionY is { } insertionY)
+            dc.DrawLine(new Pen(SelectedBrush, 3), new Point(visibleLeft, insertionY), new Point(visibleRight, insertionY));
         if (RangeStart is { } start && RangeEnd is { } end && end > start)
         {
             double left = X(start), right = X(end);
@@ -380,11 +401,12 @@ public sealed class VideoTimelineControl : FrameworkElement
         int index;
         VideoEditClip clip;
         double start;
-        if (point.Y >= 182)
+        Guid id = Timeline.LayerOrder[TrackOrderAt(32 + (point.Y - 32) * TrackHeightScale)];
+        if (id != Guid.Empty)
         {
-            int lane = (int)((point.Y - 182) / 64);
-            if (lane >= Timeline.Tracks.Count) return (-1, 0, null);
-            VideoEditTrack track = Timeline.Tracks[lane];
+            VideoEditTrack track = Timeline.Tracks.First(track => track.Id == id);
+            double top = TrackTop(id);
+            if (point.Y < top + 4 || point.Y > top + 59) return (-1, 0, track.Id);
             TimeSpan time = TimeAt(point.X);
             index = track.Clips.ToList().FindIndex(item => time >= item.Position && time < item.Position + item.Duration);
             if (index < 0) return (-1, 0, track.Id);
@@ -392,7 +414,8 @@ public sealed class VideoTimelineControl : FrameworkElement
         }
         else
         {
-            if (point.Y < 37 || point.Y > 158) return (-1, 0, null);
+            double top = TrackTop(null);
+            if (point.Y < top + 5 || point.Y > top + 126) return (-1, 0, null);
             index = Hit(point.X);
             if (index < 0) return (-1, 0, null);
             clip = Timeline.Clips[index]; start = X(Timeline.StartOf(index));

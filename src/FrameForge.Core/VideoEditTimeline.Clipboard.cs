@@ -53,7 +53,7 @@ public sealed partial class VideoEditTimeline
             VideoEditClip[] clips = Capture(track.Clips);
             if (clips.Length > 0) lanes.Add(track with { Clips = clips });
         }
-        return lanes.Count == 0 ? null : new(lanes.ToArray(), Range: true);
+        return lanes.Count == 0 ? null : new(lanes.OrderBy(lane => _layerOrder.IndexOf(lane.Id)).ToArray(), Range: true);
     }
 
     public bool RemoveRange(TimeSpan start, TimeSpan end)
@@ -92,6 +92,7 @@ public sealed partial class VideoEditTimeline
         }).ToArray();
         if (staged.SelectMany(lane => lane.Clips).Any(clip => clip.Position + clip.Duration > TimeSpan.FromDays(7))) return false;
         Remember();
+        int inserted = 0;
         foreach (VideoEditTrack lane in staged)
         {
             Guid? targetId = copy.Range ? lane.Id == Guid.Empty ? null : lane.Id : SelectedTrackId;
@@ -103,7 +104,7 @@ public sealed partial class VideoEditTimeline
             if (whole || existing == null || collision)
             {
                 var added = lane with { Id = Guid.NewGuid(), Name = Loc.Format("EditorCopiedTrackName", lane.Name[..Math.Min(230, lane.Name.Length)]) };
-                _tracks.Add(added); selected = added.Id;
+                _tracks.Add(added); _layerOrder.Insert(inserted++, added.Id); selected = added.Id;
             }
             else if (main)
             {

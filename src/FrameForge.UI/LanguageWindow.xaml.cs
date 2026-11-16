@@ -24,7 +24,7 @@ public partial class LanguageWindow : Window
             return true;
 
         var window = new LanguageWindow();
-        if (window.ShowDialog() != true)
+        if (ModalBackdrop.ShowDialog(window) != true)
             return false;
 
         settings.Language = (AppLanguage)window.LanguageBox.SelectedValue;

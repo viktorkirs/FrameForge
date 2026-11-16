@@ -16,6 +16,7 @@ internal static partial class Program
     {
         RunEditorTrackCoreTests();
         RunEditorVisualCoreTests();
+        RunEditorLayerOrderCoreTests();
         Test("trimming either edge preserves neighboring clip positions and source mapping", () =>
         {
             var timeline = new VideoEditTimeline(TimeSpan.FromSeconds(10));

@@ -30,7 +30,7 @@ internal static partial class Program
             string projectPath = Path.Combine(_output, "visual-layers.ffproj");
             VideoEditProjectFile.Save(projectPath, new(timeline.Snapshot(), 1080, 1920, 30));
             VideoEditProject restored = VideoEditProjectFile.Load(projectPath);
-            Check(restored.Version == 3 && restored.Timeline.Tracks.Last().Clips.Single().Text == text, "Saved text layer lost editable formatting");
+            Check(restored.Version == 4 && restored.Timeline.Tracks.Last().Clips.Single().Text == text, "Saved text layer lost editable formatting");
             Check(VideoEditProjectFile.MediaPaths(restored.Timeline).Count() == 2, "Text created an external media dependency");
             Check(timeline.RemoveRange(TimeSpan.FromSeconds(3.5), TimeSpan.FromSeconds(4.5)) && timeline.Undo(), "Range cutting failed with still layers");
         });

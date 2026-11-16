@@ -59,7 +59,7 @@ public sealed class MainViewModel : ObservableObject
         PauseCommand = new RelayCommand(TogglePause, () => IsRecording && !_busy && !_finishing);
         ScreenshotCommand = new RelayCommand(TakeScreenshot, () => !_busy && !_finishing);
         SettingsCommand = new RelayCommand(EditSettings, () => !IsRecording && !_busy);
-        AboutCommand = new RelayCommand(() => new AboutWindow(Updates) { Owner = Application.Current.MainWindow }.ShowDialog());
+        AboutCommand = new RelayCommand(() => ModalBackdrop.ShowDialog(new AboutWindow(Updates) { Owner = Application.Current.MainWindow }));
         CycleMonitorCommand = new RelayCommand(CycleMonitor, () => !IsRecording && !_busy);
         ScreenModeCommand = new RelayCommand(SelectScreen, () => !IsRecording && !_busy);
         WindowModeCommand = new RelayCommand(SelectWindow, () => !IsRecording && !_busy);

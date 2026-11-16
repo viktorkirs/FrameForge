@@ -10,6 +10,13 @@
   <Window.Resources>
     <ResourceDictionary>
     <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Assets/EditorIcons.xaml"/></ResourceDictionary.MergedDictionaries>
+    <Style x:Key="TrackGrip" TargetType="Thumb">
+      <Setter Property="Cursor" Value="SizeNS"/>
+      <Setter Property="Focusable" Value="True"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Thumb">
+        <Border Background="Transparent"><TextBlock Text="⋮" FontSize="18" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="EditorButton" TargetType="Button">
       <Setter Property="Background" Value="{StaticResource CardBrush}"/>
       <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>

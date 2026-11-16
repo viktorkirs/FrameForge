@@ -19,7 +19,7 @@ public partial class AppDialog : Window
         dialog.PrimaryAction.Content = Loc.Get("EditorSaveProject");
         dialog.DiscardAction.Content = Loc.Get("EditorDiscardChanges");
         dialog.CancelAction.Content = Loc.Get("Cancel");
-        dialog.AttachOwner(owner); dialog.ShowDialog(); return dialog._result;
+        dialog.AttachOwner(owner); ModalBackdrop.ShowDialog(dialog); return dialog._result;
     }
 
     public static void ShowError(Window? owner, string message, string title)
@@ -28,7 +28,7 @@ public partial class AppDialog : Window
         dialog.DialogTitle.Text = title; dialog.DialogMessage.Text = message; dialog.DialogSymbol.Text = "!";
         dialog.PrimaryAction.Content = Loc.Get("DialogOK");
         dialog.DiscardAction.Visibility = dialog.CancelAction.Visibility = Visibility.Collapsed;
-        dialog.AttachOwner(owner); dialog.ShowDialog();
+        dialog.AttachOwner(owner); ModalBackdrop.ShowDialog(dialog);
     }
 
     void AttachOwner(Window? owner)

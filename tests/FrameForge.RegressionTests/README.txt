@@ -21,6 +21,10 @@ compact row alignment, both splitters, themed dialog cancellation and switching 
 Image/text checks decode actual MP4 pixels to verify transparent holes, partial alpha, text color,
 timed overlays and transformed images. They also verify file-drop imports at a chosen timeline time,
 live formatting, editable text copy/paste and version-three project resume without generated text files.
+Layer-order checks reopen a version-three image-above-video fixture, inspect actual preview and MP4
+pixels during the overlap and after the video ends, drag track grips, undo/cancel, and move the linked
+main lane. Version-four round-trips preserve ordering without shifting clips. Modal checks verify
+dark glass adorners, blur on the owner chain, nested scope lifetime and restoration after Cancel.
 Project round-trips, relative path relocation, invalid-file preservation and track history also run headlessly.
 After --editor, --editor-microphone records two short microphone takes while the synthetic video plays
 and checks their timeline positions and automatic stopping. WAV fixtures stay in the verification folder.

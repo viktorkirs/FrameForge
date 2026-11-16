@@ -502,7 +502,7 @@ public partial class VideoEditorWindow : Window
             Filter = "FrameForge projects / video|*.ffproj;*.mp4;*.mov;*.m4v;*.wmv;*.avi|FrameForge (*.ffproj)|*.ffproj|MP4 (*.mp4)|*.mp4",
             CheckFileExists = true, Title = Loc.Get("EditorOpenProject")
         };
-        if (dialog.ShowDialog(this) == true && ConfirmDiscard())
+        if (ModalBackdrop.ShowDialog(dialog, this) == true && ConfirmDiscard())
         {
             if (string.Equals(Path.GetExtension(dialog.FileName), VideoEditProjectFile.Extension, StringComparison.OrdinalIgnoreCase)) await LoadProjectAsync(dialog.FileName);
             else await LoadAsync(dialog.FileName);
@@ -519,7 +519,7 @@ public partial class VideoEditorWindow : Window
             InitialDirectory = Path.GetDirectoryName(_sourcePath), FileName = Path.GetFileNameWithoutExtension(_sourcePath) + "-edited.mp4",
             Title = Loc.Get("EditorExport")
         };
-        if (dialog.ShowDialog(this) != true) return;
+        if (ModalBackdrop.ShowDialog(dialog, this) != true) return;
         _exportTask = ExportAsync(dialog.FileName);
         await _exportTask;
     }
@@ -600,6 +600,15 @@ public partial class VideoEditorWindow : Window
 
     void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        if (_reorderingTrack)
+        {
+            if (e.Key == Key.Escape)
+            {
+                if (Mouse.Captured is System.Windows.Controls.Primitives.Thumb grip) grip.CancelDrag();
+                else FinishTrackReorder(canceled: true);
+            }
+            e.Handled = true; return;
+        }
         if (_loading || _exporting) return;
         if (_voiceRecorder != null) { if (e.Key == Key.Space) { Pause(); e.Handled = true; } return; }
         bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);

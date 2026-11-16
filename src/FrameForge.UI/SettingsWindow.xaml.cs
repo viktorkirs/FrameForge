@@ -76,7 +76,7 @@ public partial class SettingsWindow : Window
     {
         var window = new SettingsWindow(settings, monitors) { Owner = owner };
         window.FitScreen(owner);
-        bool accepted = window.ShowDialog() == true;
+        bool accepted = ModalBackdrop.ShowDialog(window) == true;
         edited = window._settings;
         return accepted;
     }
@@ -126,7 +126,7 @@ public partial class SettingsWindow : Window
             Title = Loc.Get("FolderTitle"),
             InitialDirectory = Directory.Exists(FolderBox.Text) ? FolderBox.Text : AppPaths.DefaultOutputDirectory
         };
-        if (dialog.ShowDialog(this) == true)
+        if (ModalBackdrop.ShowDialog(dialog, this) == true)
             FolderBox.Text = dialog.FolderName;
     }
 
