@@ -59,11 +59,11 @@ public partial class VideoEditorWindow
 
     void FillFrame_Click(object sender, RoutedEventArgs e)
     {
-        if (_source == null || _timeline?.SelectedClip is not { } clip || !_previews.TryGetValue(clip.SourcePath ?? _sourcePath!, out VideoEditorPreview? preview)) return;
+        if (_source == null || _timeline?.SelectedClip is not { } clip || !TryGetVisualSource(clip, out VideoEditorSource source)) return;
         VideoFrameTransform transform = clip.Transform;
-        double width = preview.Source.Width * (1 - transform.Left - transform.Right), height = preview.Source.Height * (1 - transform.Top - transform.Bottom);
+        double width = source.Width * (1 - transform.Left - transform.Right), height = source.Height * (1 - transform.Top - transform.Bottom);
         if (transform.QuarterTurns % 2 == 1) (width, height) = (height, width);
-        double scale = Math.Max(_source.Width / width, _source.Height / height) / Math.Min(_source.Width / width, _source.Height / height);
+        double scale = Math.Max(_source.Width / width, _source.Height / height) / VideoEditorVisuals.Fit(clip, _source.Width, _source.Height, width, height);
         if (_timeline.SetSelectedTransform(transform with { Scale = Math.Clamp(scale, .1, 4), OffsetX = 0, OffsetY = 0 })) AfterEdit();
     }
 

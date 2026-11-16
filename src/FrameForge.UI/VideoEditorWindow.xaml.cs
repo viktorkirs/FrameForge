@@ -46,6 +46,7 @@ public partial class VideoEditorWindow : Window
         TimelineCanvas.SelectionChanged += RefreshSelection;
         TimelineCanvas.Edited += position => AfterEdit(previewPosition: position);
         InitializeTracks();
+        InitializeVisualLayers();
         InitializeTimelineTools();
         Loc.Changed += EditorLanguageChanged;
         RefreshControls();
@@ -61,8 +62,7 @@ public partial class VideoEditorWindow : Window
         }
         else
         {
-            PreviewMessage.Text = Loc.Get("EditorOpen");
-            PickSource();
+            PreviewMessage.Text = Loc.Get("EditorDropHint");
         }
     }
 
@@ -173,15 +173,17 @@ public partial class VideoEditorWindow : Window
 
     async Task ReadThumbnailsAsync()
     {
-        if (_timeline == null || _sourcePath == null || _waveformCancellation == null) return;
-        string path = _sourcePath;
+        if (_timeline == null || _waveformCancellation == null) return;
+        string? path = _sourcePath;
         CancellationToken token = _waveformCancellation.Token;
         Dictionary<long, ImageSource> thumbnails = _thumbnails;
         HashSet<long> pending = _pendingThumbnails;
         foreach (VideoEditClip clip in _timeline.Clips.Concat(_timeline.Tracks.Where(track => track.Kind == VideoEditTrackKind.Video).SelectMany(track => track.Clips)).ToArray())
         {
             TimeSpan start = clip.Start;
-            string clipPath = clip.SourcePath ?? path;
+            if (clip.IsStill) { GetStillBitmap(clip); TimelineCanvas.InvalidateVisual(); continue; }
+            string? clipPath = clip.SourcePath ?? path;
+            if (clipPath == null) continue;
             if (token.IsCancellationRequested || _closed) return;
             if (TimelineCanvas.SourceThumbnails.ContainsKey((clipPath, start.Ticks))) continue;
             try
@@ -406,6 +408,7 @@ public partial class VideoEditorWindow : Window
         {
             PreviewMessage.Visibility = Visibility.Collapsed;
             Seek(previewPosition ?? (selectStart ? _timeline.SelectedStart : _position));
+            if (selectStart) ShowSelectedTrack();
             StatusText.Text = "";
         }
         else
@@ -449,9 +452,10 @@ public partial class VideoEditorWindow : Window
         Transport.IsEnabled = !_loading && !_exporting && hasClips;
         SeekSlider.IsEnabled = available && hasClips;
         EditTools.IsEnabled = available;
-        ImportTools.IsEnabled = available && _timeline != null;
+        ImportTools.IsEnabled = available;
         Inspector.IsEnabled = available && _timeline != null;
         VolumeSlider.IsEnabled = selected;
+        VolumeTools.Visibility = _timeline?.SelectedClip?.IsStill == true ? Visibility.Collapsed : Visibility.Visible;
         FrameTools.IsEnabled = available && selected && _timeline!.SelectedTrack?.Kind != VideoEditTrackKind.Audio;
         RemoveTrackButton.IsEnabled = _timeline?.SelectedTrack != null;
         ApplyPositionButton.IsEnabled = selected;
@@ -465,7 +469,7 @@ public partial class VideoEditorWindow : Window
         UndoButton.IsEnabled = _timeline?.CanUndo == true;
         RedoButton.IsEnabled = _timeline?.CanRedo == true;
         CopyTrackButton.IsEnabled = available && _timeline?.SelectedClips.Count > 0;
-        PasteButton.IsEnabled = PasteTrackButton.IsEnabled = available && _timeline != null;
+        PasteButton.IsEnabled = PasteTrackButton.IsEnabled = available;
         RefreshRangeTools();
         ZoomSlider.IsEnabled = available && hasClips;
         VoiceButton.IsEnabled = !_loading && !_exporting && hasClips;

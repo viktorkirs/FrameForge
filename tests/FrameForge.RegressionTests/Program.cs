@@ -75,6 +75,11 @@ internal static partial class Program
                 RunEditorTrackMediaTests(Path.Combine(_output, "editor-source.mp4"), Path.Combine(_output, "editor-silent.mp4"));
                 return 0;
             }
+            if (args.Contains("--editor-visuals"))
+            {
+                RunEditorVisualMediaTests(Path.Combine(_output, "editor-source.mp4"), Path.Combine(_output, "editor-silent.mp4"), Path.Combine(_output, "editor-voice.wav"));
+                Console.WriteLine($"PASS: {_passed} image/text checks"); return 0;
+            }
             if (args.Contains("--editor"))
             {
                 RunVideoEditorTests();

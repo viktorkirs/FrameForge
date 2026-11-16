@@ -65,6 +65,7 @@ public partial class VideoEditorWindow
     {
         CloseTrackPlayback();
         _previews.Clear();
+        ClearVisualAssets();
         _previews.Add(path, preview);
         TimelineCanvas.SourceThumbnails.Clear();
         TimelineCanvas.Waveforms.Clear();
@@ -147,6 +148,20 @@ public partial class VideoEditorWindow
             }
             bool changed = preview.ClipId != clip.Id;
             preview.ClipId = clip.Id;
+            if (clip.IsStill)
+            {
+                if (changed || force)
+                {
+                    preview.FrameCancellation?.Cancel(); preview.Revision++;
+                    preview.Player.Close(); preview.Path = null; preview.Ready = false;
+                    preview.Still.Source = GetStillBitmap(clip);
+                }
+                preview.Player.Visibility = Visibility.Collapsed;
+                preview.Still.Visibility = Visibility.Visible;
+                preview.Still.Opacity = PreviewOpacity(clip, at - clip.Position);
+                if (changed || force) UpdatePreviewLayout();
+                continue;
+            }
             if (preview.Path != clip.SourcePath)
             {
                 preview.Player.Close();
@@ -181,6 +196,7 @@ public partial class VideoEditorWindow
 
     async Task ReadTrackFrameAsync(TrackPreview layer, VideoEditClip clip, TimeSpan time)
     {
+        if (clip.IsStill) { layer.Still.Source = GetStillBitmap(clip); layer.Still.Visibility = Visibility.Visible; return; }
         long revision = ++layer.Revision;
         layer.FrameCancellation?.Cancel(); layer.FrameCancellation?.Dispose();
         layer.FrameCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
@@ -220,6 +236,9 @@ public partial class VideoEditorWindow
     {
         TrackHeaders.Children.Clear();
         if (_timeline == null) return;
+        var retained = _timeline.Tracks.SelectMany(track => track.Clips).Select(clip => clip.Id).ToHashSet();
+        foreach (Guid id in _textBitmaps.Keys.Where(id => !retained.Contains(id)).ToArray()) _textBitmaps.Remove(id);
+        foreach (Guid id in TimelineCanvas.VisualThumbnails.Keys.Where(id => !retained.Contains(id)).ToArray()) TimelineCanvas.VisualThumbnails.Remove(id);
         foreach (Guid id in _trackPlayers.Keys.Where(id => !_timeline.Tracks.Any(track => track.Id == id)).ToArray())
         {
             TrackPreview preview = _trackPlayers[id];
@@ -230,7 +249,7 @@ public partial class VideoEditorWindow
             PreviewCanvas.Children.Remove(preview.Still);
             _trackPlayers.Remove(id);
         }
-        void Header(Guid? id, string label, double top, bool muted)
+        void Header(Guid? id, string label, double top, bool muted, bool hasAudio = true)
         {
             var panel = new StackPanel { Width = 101, Orientation = Orientation.Horizontal, Margin = new Thickness(2, 0, 2, 0) };
             var select = new Button
@@ -255,6 +274,7 @@ public partial class VideoEditorWindow
                 Background = Brushes.Transparent, Foreground = muted ? Brushes.Salmon : (Brush)FindResource("MutedBrush"),
                 BorderThickness = new Thickness(0), ToolTip = Loc.Get("EditorMuteTrack")
             };
+            mute.Visibility = hasAudio ? Visibility.Visible : Visibility.Hidden;
             mute.Click += (_, _) => { if (_timeline.ToggleMute(id)) AfterEdit(); };
             panel.Children.Add(mute);
             Canvas.SetTop(panel, TimelineCanvas.LaneY(top));
@@ -267,7 +287,7 @@ public partial class VideoEditorWindow
         for (int i = 0; i < _timeline.Tracks.Count; i++)
         {
             VideoEditTrack track = _timeline.Tracks[i];
-            Header(track.Id, track.Name, 182 + i * 64, track.Muted);
+            Header(track.Id, track.Name, 182 + i * 64, track.Muted, track.Kind == VideoEditTrackKind.Audio || track.Clips.Any(clip => !clip.IsStill));
         }
         TimelineCanvas.UpdateLaneHeight(); TrackHeaders.Height = TimelineCanvas.Height;
         UpdatePreviewLayout();
@@ -279,7 +299,7 @@ public partial class VideoEditorWindow
         try
         {
             VideoEditClip? clip = _timeline?.SelectedClip;
-            SelectedClipLabel.Text = clip == null ? Loc.Get("EditorSelectClip") : Path.GetFileName(clip.SourcePath ?? _sourcePath);
+            SelectedClipLabel.Text = clip == null ? Loc.Get("EditorSelectClip") : VideoEditorVisuals.Label(clip);
             SelectedClipLabel.ToolTip = clip?.SourcePath ?? _sourcePath;
             VideoFrameTransform transform = clip?.Transform ?? new();
             _workingTransform = null;
@@ -293,6 +313,7 @@ public partial class VideoEditorWindow
             VolumeSlider.Value = (clip?.Volume ?? 1) * 100;
             VolumeLabel.Text = $"{VolumeSlider.Value:0}%";
             TrackPositionBox.Text = VideoTimelineControl.Format(_timeline?.SelectedStart ?? TimeSpan.Zero, true);
+            RefreshTextInspector(clip);
         }
         finally { _refreshingInspector = false; }
     }
@@ -313,14 +334,14 @@ public partial class VideoEditorWindow
         EditorLayout.Height = Math.Max(EditorLayout.MinHeight, _editorViewportHeight - 32);
     }
 
-    Matrix FrameMatrix(VideoEditorSource source, VideoFrameTransform transform)
+    Matrix FrameMatrix(VideoEditorSource source, VideoFrameTransform transform, VideoEditClip? clip = null)
     {
         if (_source == null) return Matrix.Identity;
         double canvasWidth = PreviewCanvas.ActualWidth, canvasHeight = PreviewCanvas.ActualHeight;
         double canvasScale = Math.Max(.001, Math.Min((canvasWidth - 32) / _source.Width, (canvasHeight - 32) / _source.Height));
         double cw = source.Width * (1 - transform.Left - transform.Right), ch = source.Height * (1 - transform.Top - transform.Bottom);
         double rw = transform.QuarterTurns % 2 == 1 ? ch : cw, rh = transform.QuarterTurns % 2 == 1 ? cw : ch;
-        double fit = Math.Min(_source.Width / rw, _source.Height / rh) * transform.Scale;
+        double fit = (clip == null ? Math.Min(_source.Width / rw, _source.Height / rh) : VideoEditorVisuals.Fit(clip, _source.Width, _source.Height, rw, rh)) * transform.Scale;
         var matrix = Matrix.Identity;
         matrix.Translate(-source.Width * transform.Left, -source.Height * transform.Top);
         matrix.Rotate(transform.QuarterTurns * 90);
@@ -335,14 +356,13 @@ public partial class VideoEditorWindow
 
     void LayoutFrame(FrameworkElement element, VideoEditClip clip)
     {
-        if (!_previews.TryGetValue(clip.SourcePath ?? _sourcePath!, out VideoEditorPreview? preview)) return;
-        VideoEditorSource source = preview.Source;
+        if (!TryGetVisualSource(clip, out VideoEditorSource source)) return;
         VideoFrameTransform transform = DisplayTransform(clip);
         element.Width = source.Width;
         element.Height = source.Height;
         element.Clip = new RectangleGeometry(new Rect(source.Width * transform.Left, source.Height * transform.Top,
             source.Width * (1 - transform.Left - transform.Right), source.Height * (1 - transform.Top - transform.Bottom)));
-        element.RenderTransform = new MatrixTransform(FrameMatrix(source, transform));
+        element.RenderTransform = new MatrixTransform(FrameMatrix(source, transform, clip));
     }
 
     void UpdatePreviewLayout()
@@ -385,14 +405,13 @@ public partial class VideoEditorWindow
     {
         FrameAdorner.Visibility = Visibility.Collapsed;
         if (_playing || _source == null || _timeline?.SelectedClip is not { } clip || _timeline.SelectedTrack?.Kind == VideoEditTrackKind.Audio ||
-            !_previews.TryGetValue(clip.SourcePath ?? _sourcePath!, out VideoEditorPreview? preview)) return;
+            !TryGetVisualSource(clip, out VideoEditorSource source)) return;
         bool active = _timeline.SelectedTrackId == null
             ? HasBaseFrame && _timeline.Resolve(_position)?.ClipIndex == _timeline.SelectedIndex
             : _position >= clip.Position && _position <= clip.Position + clip.Duration;
         if (!active) return;
-        VideoEditorSource source = preview.Source;
         VideoFrameTransform transform = _workingTransform ?? clip.Transform;
-        Matrix matrix = FrameMatrix(source, _frameMode == "crop" ? UncroppedTransform(transform) : transform);
+        Matrix matrix = FrameMatrix(source, _frameMode == "crop" ? UncroppedTransform(transform) : transform, clip);
         FrameAdorner.Frame = Rect.Transform(new Rect(source.Width * transform.Left, source.Height * transform.Top,
             source.Width * (1 - transform.Left - transform.Right), source.Height * (1 - transform.Top - transform.Bottom)), matrix);
         FrameAdorner.SourceBounds = Rect.Transform(new Rect(0, 0, source.Width, source.Height), matrix);
@@ -403,15 +422,17 @@ public partial class VideoEditorWindow
 
     async void AddVideo_Click(object sender, RoutedEventArgs e)
     {
-        if (_timeline == null || _loading || _exporting || _voiceRecorder != null) return;
+        if (_loading || _exporting || _voiceRecorder != null) return;
         Pause();
         var dialog = new OpenFileDialog { Filter = "Video (*.mp4;*.mov;*.m4v;*.wmv;*.avi)|*.mp4;*.mov;*.m4v;*.wmv;*.avi", Multiselect = true, Title = Loc.Get("EditorAddVideo") };
         if (dialog.ShowDialog(this) != true) return;
+        string[] files = dialog.FileNames;
+        if (_timeline == null) { await LoadAsync(files[0]); if (_timeline == null) return; files = files.Skip(1).ToArray(); }
         if (_timeline.SelectedTrack?.Kind == VideoEditTrackKind.Audio) _timeline.SelectedTrackId = null;
         _loading = true; RefreshControls();
         try
         {
-            foreach (string file in dialog.FileNames)
+            foreach (string file in files)
             {
                 await AddVideoSourceAsync(file);
                 if (_closed) return;
@@ -437,7 +458,7 @@ public partial class VideoEditorWindow
 
     async void AddAudio_Click(object sender, RoutedEventArgs e)
     {
-        if (_timeline == null || _loading || _exporting || _voiceRecorder != null) return;
+        if (_loading || _exporting || _voiceRecorder != null) return;
         Pause();
         var dialog = new OpenFileDialog { Filter = "Audio (*.wav;*.mp3;*.flac;*.m4a)|*.wav;*.mp3;*.flac;*.m4a", Multiselect = true, Title = Loc.Get("EditorAddAudio") };
         if (dialog.ShowDialog(this) != true) return;
@@ -448,7 +469,8 @@ public partial class VideoEditorWindow
             {
                 TimeSpan duration = await VideoEditorMedia.ReadAudioDurationAsync(file);
                 if (_closed) return;
-                if (_timeline.SelectedTrack?.Kind != VideoEditTrackKind.Audio) NewTrack(VideoEditTrackKind.Audio);
+                EnsureVisualProject();
+                if (_timeline!.SelectedTrack?.Kind != VideoEditTrackKind.Audio) NewTrack(VideoEditTrackKind.Audio);
                 _timeline.AddSource(Path.GetFullPath(file), duration, _position, VideoEditTrackKind.Audio);
                 _ = ReadAdditionalWaveformAsync(file, duration);
             }
@@ -557,14 +579,14 @@ public partial class VideoEditorWindow
     void Preview_Down(object sender, MouseButtonEventArgs e)
     {
         if (_playing || _exporting || _loading || _timeline?.SelectedClip is not { } clip || _timeline.SelectedTrack?.Kind == VideoEditTrackKind.Audio || _source == null ||
-            !_previews.TryGetValue(clip.SourcePath ?? _sourcePath!, out VideoEditorPreview? preview)) return;
+            !TryGetVisualSource(clip, out VideoEditorSource source)) return;
         Point point = e.GetPosition(PreviewCanvas);
         _frameHandle = FrameAdorner.HitHandle(point);
         if (FrameAdorner.Visibility != Visibility.Visible || (_frameMode != "crop" && _frameHandle < 0 && !FrameAdorner.Frame.Contains(point))) return;
         _framePress = point;
         _gestureTransform = clip.Transform;
         _workingTransform = clip.Transform;
-        _gestureMatrix = FrameMatrix(preview.Source, _frameMode == "crop" ? UncroppedTransform(clip.Transform) : clip.Transform);
+        _gestureMatrix = FrameMatrix(source, _frameMode == "crop" ? UncroppedTransform(clip.Transform) : clip.Transform, clip);
         _gestureBounds = FrameAdorner.Frame;
         _frameGesture = _frameMode == "crop" ? (_frameHandle >= 0 ? "crop-resize" : Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && FrameAdorner.Frame.Contains(point) ? "crop-move" : "crop-new")
             : _frameHandle >= 0 ? "resize" : "move";
@@ -572,8 +594,8 @@ public partial class VideoEditorWindow
         {
             Matrix inverse = _gestureMatrix; inverse.Invert();
             Point sourcePoint = inverse.Transform(FrameAdorner.Handles[_frameHandle]);
-            double left = clip.Transform.Left * preview.Source.Width, right = (1 - clip.Transform.Right) * preview.Source.Width;
-            double top = clip.Transform.Top * preview.Source.Height, bottom = (1 - clip.Transform.Bottom) * preview.Source.Height;
+            double left = clip.Transform.Left * source.Width, right = (1 - clip.Transform.Right) * source.Width;
+            double top = clip.Transform.Top * source.Height, bottom = (1 - clip.Transform.Bottom) * source.Height;
             _cropEdgeX = Math.Abs(sourcePoint.X - left) < 1 ? -1 : Math.Abs(sourcePoint.X - right) < 1 ? 1 : 0;
             _cropEdgeY = Math.Abs(sourcePoint.Y - top) < 1 ? -1 : Math.Abs(sourcePoint.Y - bottom) < 1 ? 1 : 0;
         }
@@ -594,26 +616,26 @@ public partial class VideoEditorWindow
             }
             return;
         }
-        if (!_previews.TryGetValue(clip.SourcePath ?? _sourcePath!, out VideoEditorPreview? preview)) return;
+        if (!TryGetVisualSource(clip, out VideoEditorSource source)) return;
         double fit = Math.Max(.001, Math.Min((PreviewCanvas.ActualWidth - 32) / _source.Width, (PreviewCanvas.ActualHeight - 32) / _source.Height));
         VideoFrameTransform transform = original;
         if (_frameGesture.StartsWith("crop", StringComparison.Ordinal))
         {
             Matrix inverse = _gestureMatrix; if (!inverse.HasInverse) return; inverse.Invert();
             Point a = inverse.Transform(press), b = inverse.Transform(point);
-            double x = Math.Clamp(b.X / preview.Source.Width, 0, 1), y = Math.Clamp(b.Y / preview.Source.Height, 0, 1);
+            double x = Math.Clamp(b.X / source.Width, 0, 1), y = Math.Clamp(b.Y / source.Height, 0, 1);
             double left = original.Left, top = original.Top, right = 1 - original.Right, bottom = 1 - original.Bottom;
             if (_frameGesture == "crop-new")
             {
-                double ax = Math.Clamp(a.X / preview.Source.Width, 0, 1), ay = Math.Clamp(a.Y / preview.Source.Height, 0, 1);
+                double ax = Math.Clamp(a.X / source.Width, 0, 1), ay = Math.Clamp(a.Y / source.Height, 0, 1);
                 left = Math.Min(ax, x); right = Math.Max(ax, x); top = Math.Min(ay, y); bottom = Math.Max(ay, y);
                 if (right - left < .05 || bottom - top < .05) return;
             }
             else if (_frameGesture == "crop-move")
             {
                 double width = right - left, height = bottom - top;
-                left = Math.Clamp(left + (b.X - a.X) / preview.Source.Width, 0, 1 - width);
-                top = Math.Clamp(top + (b.Y - a.Y) / preview.Source.Height, 0, 1 - height);
+                left = Math.Clamp(left + (b.X - a.X) / source.Width, 0, 1 - width);
+                top = Math.Clamp(top + (b.Y - a.Y) / source.Height, 0, 1 - height);
                 right = left + width; bottom = top + height;
             }
             else

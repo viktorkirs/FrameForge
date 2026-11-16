@@ -100,18 +100,22 @@ public partial class VideoEditorWindow
 
     async Task PasteAsync(bool forceNewTracks)
     {
-        if (_timeline == null || _loading || _exporting || _voiceRecorder != null) return;
+        if (_loading || _exporting || _voiceRecorder != null) return;
         VideoEditCopy? copy = ReadEditorClipboard();
         if (copy?.IsValid != true) { StatusText.Text = Loc.Get("EditorClipboardEmpty"); return; }
+        EnsureVisualProject();
         Pause(); _loading = true; RefreshControls();
         try
         {
             var staged = new Dictionary<string, VideoEditorPreview>(StringComparer.OrdinalIgnoreCase);
             var durations = new Dictionary<string, TimeSpan>(StringComparer.OrdinalIgnoreCase);
-            foreach (string path in copy.Tracks.SelectMany(track => track.Clips).Select(clip => Path.GetFullPath(clip.SourcePath!)).Distinct(StringComparer.OrdinalIgnoreCase))
+            var images = new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in copy.Tracks.SelectMany(track => track.Clips).Where(clip => clip.Kind != VideoEditClipKind.Text).Select(clip => Path.GetFullPath(clip.SourcePath!)).Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                bool video = copy.Tracks.Any(track => track.Kind == VideoEditTrackKind.Video && track.Clips.Any(clip => string.Equals(Path.GetFullPath(clip.SourcePath!), path, StringComparison.OrdinalIgnoreCase)));
-                if (video)
+                bool image = copy.Tracks.SelectMany(track => track.Clips).Any(clip => clip.Kind == VideoEditClipKind.Image && string.Equals(Path.GetFullPath(clip.SourcePath!), path, StringComparison.OrdinalIgnoreCase));
+                bool video = copy.Tracks.Any(track => track.Kind == VideoEditTrackKind.Video && track.Clips.Any(clip => clip.Kind == VideoEditClipKind.Media && string.Equals(Path.GetFullPath(clip.SourcePath!), path, StringComparison.OrdinalIgnoreCase)));
+                if (image) { images[path] = VideoEditorVisuals.ReadImage(path); durations[path] = TimeSpan.FromDays(7); }
+                else if (video)
                 {
                     VideoEditorPreview preview = _previews.TryGetValue(path, out VideoEditorPreview? known) ? known : await VideoEditorMedia.OpenPreviewAsync(path);
                     staged[path] = preview; durations[path] = preview.Source.Duration;
@@ -120,14 +124,16 @@ public partial class VideoEditorWindow
                 if (_closed) return;
             }
             foreach (VideoEditClip clip in copy.Tracks.SelectMany(track => track.Clips))
-                if (clip.End > durations[Path.GetFullPath(clip.SourcePath!)]) throw new InvalidDataException(Loc.Format("EditorMediaChanged", clip.SourcePath));
+                if (clip.Kind == VideoEditClipKind.Text) _ = VideoEditorVisuals.RenderText(clip.Text!);
+                else if (clip.End > durations[Path.GetFullPath(clip.SourcePath!)]) throw new InvalidDataException(Loc.Format("EditorMediaChanged", clip.SourcePath));
             foreach (var source in staged) _previews[source.Key] = source.Value;
-            copy = copy with { Tracks = copy.Tracks.Select(track => track with { Clips = track.Clips.Select(clip => clip with
+            foreach (var source in images) _imageBitmaps[source.Key] = source.Value;
+            copy = copy with { Tracks = copy.Tracks.Select(track => track with { Clips = track.Clips.Select(clip => clip.Kind == VideoEditClipKind.Text ? clip : clip with
             { SourcePath = Path.GetFullPath(clip.SourcePath!), OriginalDuration = durations[Path.GetFullPath(clip.SourcePath!)] }).ToArray() }).ToArray() };
-            if (_timeline.Paste(copy, _position, forceNewTracks))
+            if (_timeline!.Paste(copy, _position, forceNewTracks))
             {
                 TimelineCanvas.ClearRange(); AfterEdit(selectStart: true);
-                foreach (var source in durations) _ = ReadAdditionalWaveformAsync(source.Key, source.Value);
+                foreach (var source in durations.Where(source => !images.ContainsKey(source.Key))) _ = ReadAdditionalWaveformAsync(source.Key, source.Value);
                 StatusText.Text = Loc.Get("EditorPasted");
             }
         }

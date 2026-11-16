@@ -8,7 +8,8 @@ public sealed record VideoEditCopy(IReadOnlyList<VideoEditTrack> Tracks, bool Wh
         && Tracks.All(track => track != null && Enum.IsDefined(track.Kind) && track.Name is { Length: > 0 and <= 256 } && track.Clips != null)
         && Tracks.Sum(track => track.Clips.Count) <= 10000
         && Tracks.All(track => NoOverlap(track.Clips))
-        && Tracks.SelectMany(track => track.Clips).All(clip => clip != null && !string.IsNullOrWhiteSpace(clip.SourcePath)
+        && Tracks.All(track => track.Kind != VideoEditTrackKind.Audio || track.Clips.All(clip => clip != null && !clip.IsStill))
+        && Tracks.SelectMany(track => track.Clips).All(clip => clip != null && clip.HasValidVisual && (clip.Kind == VideoEditClipKind.Text || !string.IsNullOrWhiteSpace(clip.SourcePath))
             && clip.Start >= TimeSpan.Zero && clip.Duration >= VideoEditTimeline.MinimumDuration && clip.End <= clip.OriginalDuration
             && clip.OriginalDuration <= TimeSpan.FromDays(7) && clip.Position >= TimeSpan.Zero && clip.Position + clip.Duration <= TimeSpan.FromDays(7)
             && clip.Transform?.IsValid == true && double.IsFinite(clip.Volume) && clip.Volume is >= 0 and <= 1
@@ -31,7 +32,7 @@ public sealed partial class VideoEditTimeline
         if (!wholeTrack && SelectedClip == null) return null;
         IEnumerable<VideoEditClip> clips = wholeTrack ? SelectedClips : [SelectedClip! with { Position = TimeSpan.Zero }];
         var lane = new VideoEditTrack(SelectedTrackId ?? Guid.Empty, SelectedTrack?.Kind ?? VideoEditTrackKind.Video,
-            SelectedTrack?.Name ?? Loc.Get("EditorVideoTrack"), clips.Select(clip => clip with { SourcePath = clip.SourcePath ?? SourcePath }).ToArray())
+            SelectedTrack?.Name ?? Loc.Get("EditorVideoTrack"), clips.Select(clip => clip.Kind == VideoEditClipKind.Text ? clip : clip with { SourcePath = clip.SourcePath ?? SourcePath }).ToArray())
         { Muted = SelectedTrack?.Muted ?? MainMuted };
         return new([lane], WholeTracks: wholeTrack);
     }
@@ -43,7 +44,7 @@ public sealed partial class VideoEditTimeline
             .Where(clip => clip.Position < end && clip.Position + clip.Duration > start)
             .Select(clip => Slice(clip, Max(start, clip.Position), Min(end, clip.Position + clip.Duration), keepId: true))
             .Where(clip => clip.Duration >= MinimumDuration)
-            .Select(clip => clip with { SourcePath = clip.SourcePath ?? SourcePath, Position = clip.Position - start }).ToArray();
+            .Select(clip => clip with { SourcePath = clip.Kind == VideoEditClipKind.Text ? null : clip.SourcePath ?? SourcePath, Position = clip.Position - start }).ToArray();
         var lanes = new List<VideoEditTrack>();
         VideoEditClip[] main = Capture(Clips);
         if (main.Length > 0) lanes.Add(new(Guid.Empty, VideoEditTrackKind.Video, Loc.Get("EditorVideoTrack"), main) { Muted = MainMuted });
@@ -95,7 +96,7 @@ public sealed partial class VideoEditTimeline
         {
             Guid? targetId = copy.Range ? lane.Id == Guid.Empty ? null : lane.Id : SelectedTrackId;
             VideoEditTrack? target = _tracks.FirstOrDefault(track => track.Id == targetId);
-            bool main = targetId == null && lane.Kind == VideoEditTrackKind.Video;
+            bool main = targetId == null && lane.Kind == VideoEditTrackKind.Video && lane.Clips.All(clip => !clip.IsStill);
             IReadOnlyList<VideoEditClip>? existing = main ? Clips : target?.Kind == lane.Kind ? target.Clips : null;
             bool collision = existing != null && lane.Clips.Any(clip => existing.Any(other => clip.Position < other.Position + other.Duration && clip.Position + clip.Duration > other.Position));
             Guid? selected;

@@ -71,7 +71,7 @@ public static class VideoEditorMedia
         string destination = Path.GetFullPath(destinationPath);
         VideoEditClip[] all = snapshot.Clips.Concat(snapshot.Tracks.SelectMany(track => track.Clips)).ToArray();
         if (snapshot.SourcePath != null && string.Equals(Path.GetFullPath(snapshot.SourcePath), destination, StringComparison.OrdinalIgnoreCase) ||
-            all.Any(clip => string.Equals(Path.GetFullPath(clip.SourcePath ?? snapshot.SourcePath!), destination, StringComparison.OrdinalIgnoreCase)))
+            all.Where(clip => clip.Kind != VideoEditClipKind.Text).Any(clip => string.Equals(Path.GetFullPath(clip.SourcePath ?? snapshot.SourcePath!), destination, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException(Loc.Get("EditorProtectSource"));
         if (snapshot.Duration < VideoEditTimeline.MinimumDuration) throw new InvalidOperationException(Loc.Get("EditorEmpty"));
         cancellationToken.ThrowIfCancellationRequested();
@@ -81,11 +81,27 @@ public static class VideoEditorMedia
         bool hasAudio = false;
         VideoEditClip[] videos = snapshot.Clips.Concat(snapshot.Tracks.Where(track => track.Kind == VideoEditTrackKind.Video).SelectMany(track => track.Clips)).ToArray();
         static bool NeedsTransform(VideoEditClip clip) => clip.Transform.Left != 0 || clip.Transform.Top != 0 || clip.Transform.Right != 0 || clip.Transform.Bottom != 0 || clip.Transform.QuarterTurns != 0;
-        int transformCount = videos.Count(NeedsTransform), transformed = 0;
+        int transformCount = videos.Count(clip => !clip.IsStill && NeedsTransform(clip)), transformed = 0;
 
         async Task AddVideo(VideoEditClip interval, TimeSpan position, MediaOverlayLayer layer, bool muted)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (interval.IsStill)
+            {
+                ValidateInterval(interval, interval.OriginalDuration);
+                BitmapSource bitmap = interval.Kind == VideoEditClipKind.Text
+                    ? VideoEditorVisuals.RenderText(interval.Text!) : VideoEditorVisuals.ReadImage(interval.SourcePath!);
+                BitmapSource transformedBitmap = VideoEditorVisuals.Transform(bitmap, interval.Transform);
+                string temporaryImage = Path.Combine(Path.GetDirectoryName(destination)!, $".frameforge-layer-{Guid.NewGuid():N}.png");
+                intermediates.Add(temporaryImage);
+                VideoEditorVisuals.SaveOverlayImage(transformedBitmap, temporaryImage);
+                MediaClip imageClip = await MediaClip.CreateFromImageFileAsync(await StorageFile.GetFileFromPathAsync(temporaryImage), interval.Duration).AsTask(cancellationToken);
+                double fit = VideoEditorVisuals.Fit(interval, width, height, transformedBitmap.PixelWidth, transformedBitmap.PixelHeight) * interval.Transform.Scale;
+                double imageWidth = transformedBitmap.PixelWidth * fit, imageHeight = transformedBitmap.PixelHeight * fit;
+                AddOverlays(interval, imageClip, new Rect((width - imageWidth) / 2 + interval.Transform.OffsetX * width,
+                    (height - imageHeight) / 2 + interval.Transform.OffsetY * height, imageWidth, imageHeight), position, layer);
+                return;
+            }
             string path = Path.GetFullPath(interval.SourcePath ?? snapshot.SourcePath!);
             if (!originals.TryGetValue(path, out MediaClip? original))
             {
@@ -145,6 +161,22 @@ public static class VideoEditorMedia
             double scale = Math.Min(width / rotatedWidth, height / rotatedHeight) * transform.Scale;
             double w = rotatedWidth * scale, h = rotatedHeight * scale;
             var rectangle = new Rect((width - w) / 2 + transform.OffsetX * width, (height - h) / 2 + transform.OffsetY * height, w, h);
+            AddOverlays(interval, clip, rectangle, position, layer);
+            if (!muted && interval.Volume > 0 && original.EmbeddedAudioTracks.Count > 0)
+            {
+                BackgroundAudioTrack audio = BackgroundAudioTrack.CreateFromEmbeddedAudioTrack(original.EmbeddedAudioTracks[0]);
+                if (interval.Start < audio.OriginalDuration)
+                {
+                    audio.TrimTimeFromStart = interval.Start;
+                    audio.TrimTimeFromEnd = TimeSpan.FromTicks(Math.Max(0, (audio.OriginalDuration - interval.End).Ticks));
+                    audio.Delay = position; audio.Volume = interval.Volume;
+                    composition.BackgroundAudioTracks.Add(audio); hasAudio = true;
+                }
+            }
+        }
+
+        void AddOverlays(VideoEditClip interval, MediaClip clip, Rect rectangle, TimeSpan position, MediaOverlayLayer layer)
+        {
             if (interval.FadeIn == TimeSpan.Zero && interval.FadeOut == TimeSpan.Zero)
                 layer.Overlays.Add(new MediaOverlay(clip, rectangle, 1) { Delay = position, AudioEnabled = false });
             else
@@ -168,17 +200,6 @@ public static class VideoEditorMedia
                     part.TrimTimeFromEnd = clip.TrimTimeFromEnd + TimeSpan.FromTicks(clip.TrimmedDuration.Ticks - to);
                     layer.Overlays.Add(new MediaOverlay(part, rectangle, interval.OpacityAt(TimeSpan.FromTicks(from)))
                     { Delay = position + TimeSpan.FromTicks(from), AudioEnabled = false });
-                }
-            }
-            if (!muted && interval.Volume > 0 && original.EmbeddedAudioTracks.Count > 0)
-            {
-                BackgroundAudioTrack audio = BackgroundAudioTrack.CreateFromEmbeddedAudioTrack(original.EmbeddedAudioTracks[0]);
-                if (interval.Start < audio.OriginalDuration)
-                {
-                    audio.TrimTimeFromStart = interval.Start;
-                    audio.TrimTimeFromEnd = TimeSpan.FromTicks(Math.Max(0, (audio.OriginalDuration - interval.End).Ticks));
-                    audio.Delay = position; audio.Volume = interval.Volume;
-                    composition.BackgroundAudioTracks.Add(audio); hasAudio = true;
                 }
             }
         }
@@ -226,7 +247,7 @@ public static class VideoEditorMedia
 
     static void ValidateInterval(VideoEditClip interval, TimeSpan duration)
     {
-        if (interval.Start < TimeSpan.Zero || interval.End > duration || interval.Duration < VideoEditTimeline.MinimumDuration ||
+        if (!interval.HasValidVisual || interval.Start < TimeSpan.Zero || interval.End > duration || interval.Duration < VideoEditTimeline.MinimumDuration ||
             interval.Position < TimeSpan.Zero || !interval.Transform.IsValid || !double.IsFinite(interval.Volume) || interval.Volume is < 0 or > 1 ||
             interval.FadeIn < TimeSpan.Zero || interval.FadeOut < TimeSpan.Zero || interval.FadeIn + interval.FadeOut > interval.Duration)
             throw new ArgumentOutOfRangeException(nameof(interval));

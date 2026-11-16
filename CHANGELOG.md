@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0
+
+- Add image layers, including PNG transparency, with independent timing, preview handles,
+  crop, rotation, scale, fades and MP4 compositing. Support PNG, JPEG, BMP, TIFF and static GIF frames.
+- Add editable text layers with installed fonts, size, color/alpha, bold, italic, underline,
+  multiline text and alignment. Use the same transparent raster and placement for preview and export.
+- Drag images, video and audio from Explorer into the editor. Timeline drops use the pointer's
+  start time and create independent tracks; dropping a single `.ffproj` opens the project.
+- Store text inside version-three projects; preserve relative image paths and continue to load
+  version-one and version-two projects. Still layers support splitting, range cuts, copy/paste and undo.
+
 ## 1.5.0
 
 - Keep absolute clip positions on the main track as well as extra tracks. Left-edge trimming moves

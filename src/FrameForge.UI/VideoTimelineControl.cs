@@ -43,6 +43,8 @@ public sealed class VideoTimelineControl : FrameworkElement
     public Dictionary<(string Path, long Ticks), ImageSource> SourceThumbnails { get; } = new();
     public Dictionary<string, AudioWaveform> Waveforms { get; } = new(StringComparer.OrdinalIgnoreCase);
     public double PixelsPerSecond { get; private set; } = 50;
+    public Dictionary<Guid, ImageSource> VisualThumbnails { get; } = new();
+    public TimeSpan DropTimeAt(double x) => TimeSpan.FromSeconds(Math.Clamp((x - Inset) / PixelsPerSecond, 0, TimeSpan.FromDays(7).TotalSeconds - 5));
     public TimeSpan Position { get => _position; set { _position = value; InvalidateVisual(); } }
     public double TrackHeightScale { get => _trackHeightScale; set { _trackHeightScale = Math.Clamp(value, .45, 1.75); UpdateLaneHeight(); InvalidateVisual(); } }
     public bool RangeSelectionMode { get; set; }
@@ -164,7 +166,7 @@ public sealed class VideoTimelineControl : FrameworkElement
             dc.DrawImage(thumbnail, new Rect(labelX, 45, 60, 35));
             labelX += 69;
         }
-        Text(dc, $"{index + 1:00}   {Format(clip.Duration)}  {System.IO.Path.GetFileName(clip.SourcePath)}", labelX, 45, TextBrush, 12);
+        Text(dc, $"{index + 1:00}   {Format(clip.Duration)}  {VideoEditorVisuals.Label(clip)}", labelX, 45, TextBrush, 12);
         if (TrackHeightScale >= .8) Text(dc, $"{Format(clip.Start)} → {Format(clip.End)}", labelX, 66, MutedBrush, 10);
         dc.Pop();
         dc.PushClip(new RectangleGeometry(audio));
@@ -211,9 +213,12 @@ public sealed class VideoTimelineControl : FrameworkElement
         if (track.Kind == VideoEditTrackKind.Video) DrawFades(dc, clip, rect);
         dc.PushClip(new RectangleGeometry(rect));
         double labelX = Math.Max(x + 10, left + 8);
-        if (track.Kind == VideoEditTrackKind.Video && clip.SourcePath != null && SourceThumbnails.TryGetValue((clip.SourcePath, clip.Start.Ticks), out ImageSource? image) && width > 120)
+        ImageSource? image = null;
+        if (clip.IsStill) VisualThumbnails.TryGetValue(clip.Id, out image);
+        else if (clip.SourcePath != null) SourceThumbnails.TryGetValue((clip.SourcePath, clip.Start.Ticks), out image);
+        if (track.Kind == VideoEditTrackKind.Video && image != null && width > 120)
         { dc.DrawImage(image, new Rect(labelX, y + 10, 48, 28)); labelX += 55; }
-        Text(dc, System.IO.Path.GetFileName(clip.SourcePath) + $"  {Format(clip.Duration)}", labelX, y + 9, TextBrush, 11);
+        Text(dc, VideoEditorVisuals.Label(clip) + $"  {Format(clip.Duration)}", labelX, y + 9, TextBrush, 11);
         double middle = y + 41;
         if (clip.SourcePath != null && Waveforms.TryGetValue(clip.SourcePath, out AudioWaveform? waveform) && waveform.Peaks.Length > 0)
         {

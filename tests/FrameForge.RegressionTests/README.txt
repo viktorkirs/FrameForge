@@ -18,6 +18,9 @@ They also verify multiple sources/layers, delayed voice mixing, encoded crop/rot
 alpha fades, portrait output, capture-frame hiding/restoration and .ffproj save/resume.
 Workspace checks cover black/silent gaps in actual exports, Ctrl+wheel horizontal scrolling,
 compact row alignment, both splitters, themed dialog cancellation and switching without losing edits.
+Image/text checks decode actual MP4 pixels to verify transparent holes, partial alpha, text color,
+timed overlays and transformed images. They also verify file-drop imports at a chosen timeline time,
+live formatting, editable text copy/paste and version-three project resume without generated text files.
 Project round-trips, relative path relocation, invalid-file preservation and track history also run headlessly.
 After --editor, --editor-microphone records two short microphone takes while the synthetic video plays
 and checks their timeline positions and automatic stopping. WAV fixtures stay in the verification folder.

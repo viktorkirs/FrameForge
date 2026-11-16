@@ -11,8 +11,8 @@ diagnostics are stored in the application's user-data folder (or the portable da
 
 The video editor reads the media files selected by the user and records microphone voiceovers only
 after the user starts voiceover recording. Voiceover WAV files remain in the output folder's
-`Voiceovers` subfolder. Editable `.ffproj` files store local media paths and editing settings;
-they do not embed or upload the source videos or audio. Temporary export files are removed after
+`Voiceovers` subfolder. Editable `.ffproj` files store local media paths, editable text and its formatting;
+they do not embed or upload the source videos, audio or images. Temporary export files are removed after
 successful rendering, cancellation or a handled rendering error.
 
 FrameForge does not upload this content, collect analytics, or report crashes to a server.

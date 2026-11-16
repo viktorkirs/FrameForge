@@ -59,6 +59,16 @@ copies and removes that zone without shifting later clips; Delete removes it wit
 occupied interval creates another lane rather than displacing existing clips.
 
 Use **Add video** to append another source, or create a **Video track** first to overlay it at the playhead.
+**Add image** creates an independent image layer; PNG alpha remains transparent in preview and export.
+**Add text** creates an editable text layer. The inspector provides installed fonts, size, color and alpha,
+bold, italic, underline, alignment and multiline text. Drag the preview handles to move or resize either
+layer, and drag the timeline edges or set **Layer duration** to change how long it stays on screen.
+You can start with images or text without opening a video first.
+
+Drag files from Explorer into the editor to import images, video or audio as independent tracks.
+Drop on the timeline to choose their start time, or on the preview to use the playhead. Multiple files
+receive separate layers at the same start time. Drop one `.ffproj` file to open a project.
+
 Extra tracks keep their own timing: drag their blocks to move them, drag their edges to trim, and use
 the track's speaker button to mute it. **Add audio** imports music or an existing voice recording.
 **Record voiceover** starts playback and records only the selected microphone from the playhead;
@@ -73,8 +83,9 @@ The preview and exported MP4 use the same format; scale and reposition individua
 
 **Save project** (`Ctrl+S`) writes an editable `.ffproj`; `Ctrl+Shift+S` saves a copy and `Ctrl+O` opens one.
 Projects retain clips, layers, transforms, fades, volumes, canvas format, playhead and timeline zoom.
-Version-two projects retain absolute placements and track height; version-one projects migrate on load.
-Projects reference the original video/audio files rather than embedding them. Keep those files with the
+Version-three projects retain editable text and image layers. Version-one and version-two projects migrate on load.
+Text and its formatting are stored inside the project. Projects reference the original video, audio and
+image files rather than embedding them. Keep those files with the
 project when moving it; relative paths let a project folder move together. If media is missing,
 FrameForge asks for its new location before replacing the current editing session.
 

@@ -3,6 +3,11 @@ namespace FrameForge.Core;
 /// <summary>A linked video/audio interval in the original recording. Edits never modify the source.</summary>
 public sealed record VideoEditClip(Guid Id, TimeSpan Start, TimeSpan End)
 {
+    public VideoEditClipKind Kind { get; init; }
+    public VideoEditText? Text { get; init; }
+    public bool IsStill => Kind != VideoEditClipKind.Media;
+    public bool HasValidVisual => Enum.IsDefined(Kind) && (Kind == VideoEditClipKind.Text ? Text?.IsValid == true && SourcePath == null
+        : Text == null && (Kind != VideoEditClipKind.Image || !string.IsNullOrWhiteSpace(SourcePath)));
     public TimeSpan Duration => End - Start;
     public string? SourcePath { get; init; }
     public TimeSpan OriginalDuration { get; init; }

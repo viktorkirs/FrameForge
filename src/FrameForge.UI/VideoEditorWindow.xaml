@@ -5,7 +5,8 @@
         Title="{Binding [EditorTitle], Source={x:Static local:TextTable.Instance}}"
         Width="1320" Height="900" MinWidth="860" MinHeight="640"
         WindowStartupLocation="CenterOwner" Loaded="Window_Loaded" PreviewKeyDown="Window_KeyDown"
-        Icon="pack://application:,,,/FrameForge;component/Assets/frameforge-logo.png">
+        Icon="pack://application:,,,/FrameForge;component/Assets/frameforge-logo.png"
+        AllowDrop="True" PreviewDragOver="Editor_DragOver" PreviewDrop="Editor_Drop">
   <Window.Resources>
     <ResourceDictionary>
     <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Assets/EditorIcons.xaml"/></ResourceDictionary.MergedDictionaries>
@@ -95,6 +96,56 @@
             <ComboBox x:Name="OutputFormatBox" DisplayMemberPath="Label" SelectionChanged="OutputFormat_Changed" Margin="0,5,0,12"/>
             <TextBlock Text="{Binding [EditorClipProperties], Source={x:Static local:TextTable.Instance}}" FontWeight="SemiBold"/>
             <TextBlock x:Name="SelectedClipLabel" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" Margin="0,5,0,10"/>
+            <StackPanel x:Name="TextTools" Visibility="Collapsed" Margin="0,0,0,14">
+              <TextBlock Text="{Binding [EditorTextContent], Source={x:Static local:TextTable.Instance}}" FontWeight="SemiBold" Margin="0,0,0,5"/>
+              <TextBox x:Name="TextContentBox" AcceptsReturn="True" TextWrapping="Wrap" Height="90" VerticalScrollBarVisibility="Auto" MaxLength="4000" Padding="7" TextChanged="TextLayer_Changed"/>
+              <TextBlock Text="{Binding [EditorTextFont], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,9,0,4"/>
+              <ComboBox x:Name="TextFontBox" SelectionChanged="TextLayer_Changed"/>
+              <Grid Margin="0,8,0,2">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="65"/></Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding [EditorTextSize], Source={x:Static local:TextTable.Instance}}" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
+                <TextBox x:Name="TextSizeBox" Grid.Column="1" Text="48" Padding="5,3" TextChanged="TextLayer_Changed"/>
+              </Grid>
+              <Slider x:Name="TextSizeSlider" Minimum="8" Maximum="512" Value="48" SmallChange="1" ValueChanged="TextSize_Changed" Margin="0,5,0,8"/>
+              <WrapPanel>
+                <CheckBox x:Name="TextBoldBox" Content="B" FontWeight="Bold" Margin="0,0,12,7" Checked="TextLayer_Changed" Unchecked="TextLayer_Changed" ToolTip="{Binding [EditorTextBold], Source={x:Static local:TextTable.Instance}}"/>
+                <CheckBox x:Name="TextItalicBox" Content="I" FontStyle="Italic" Margin="0,0,12,7" Checked="TextLayer_Changed" Unchecked="TextLayer_Changed" ToolTip="{Binding [EditorTextItalic], Source={x:Static local:TextTable.Instance}}"/>
+                <CheckBox x:Name="TextUnderlineBox" Margin="0,0,0,7" Checked="TextLayer_Changed" Unchecked="TextLayer_Changed" ToolTip="{Binding [EditorTextUnderline], Source={x:Static local:TextTable.Instance}}"><TextBlock Text="U" TextDecorations="Underline"/></CheckBox>
+              </WrapPanel>
+              <ComboBox x:Name="TextAlignmentBox" SelectionChanged="TextLayer_Changed" Margin="0,0,0,8">
+                <ComboBoxItem Content="{Binding [EditorTextLeft], Source={x:Static local:TextTable.Instance}}"/>
+                <ComboBoxItem Content="{Binding [EditorTextCenter], Source={x:Static local:TextTable.Instance}}"/>
+                <ComboBoxItem Content="{Binding [EditorTextRight], Source={x:Static local:TextTable.Instance}}"/>
+              </ComboBox>
+              <TextBlock Text="{Binding [EditorTextColor], Source={x:Static local:TextTable.Instance}}" FontWeight="SemiBold"/>
+              <Grid Margin="0,5,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border x:Name="TextColorPreview" Background="White" CornerRadius="4" Margin="0,0,6,0" BorderBrush="{StaticResource MutedBrush}" BorderThickness="1"/>
+                <TextBox x:Name="TextColorBox" Grid.Column="1" Text="#FFFFFFFF" Padding="5,3" TextChanged="TextLayer_Changed" ToolTip="#RRGGBB / #AARRGGBB"/>
+              </Grid>
+              <WrapPanel Margin="0,0,0,5">
+                <Button Width="25" Height="22" Background="White" Tag="#FFFFFFFF" Click="TextColor_Click" Margin="0,0,4,3"/>
+                <Button Width="25" Height="22" Background="#111827" Tag="#FF111827" Click="TextColor_Click" Margin="0,0,4,3"/>
+                <Button Width="25" Height="22" Background="#FF5058" Tag="#FFFF5058" Click="TextColor_Click" Margin="0,0,4,3"/>
+                <Button Width="25" Height="22" Background="#FFD166" Tag="#FFFFD166" Click="TextColor_Click" Margin="0,0,4,3"/>
+                <Button Width="25" Height="22" Background="#36D399" Tag="#FF36D399" Click="TextColor_Click" Margin="0,0,4,3"/>
+                <Button Width="25" Height="22" Background="#60A5FA" Tag="#FF60A5FA" Click="TextColor_Click" Margin="0,0,4,3"/>
+              </WrapPanel>
+              <Expander Header="{Binding [EditorCustomColor], Source={x:Static local:TextTable.Instance}}">
+                <Grid Margin="0,7,0,6">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                  <TextBlock Text="R" Foreground="#FF7373"/><Slider x:Name="TextRedSlider" Grid.Column="1" Minimum="0" Maximum="255" Value="255" ValueChanged="TextColorChannel_Changed" Margin="0,0,0,8"/>
+                  <TextBlock Text="G" Grid.Row="1" Foreground="#63DE9B"/><Slider x:Name="TextGreenSlider" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="255" Value="255" ValueChanged="TextColorChannel_Changed" Margin="0,0,0,8"/>
+                  <TextBlock Text="B" Grid.Row="2" Foreground="#7CB9FF"/><Slider x:Name="TextBlueSlider" Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="255" Value="255" ValueChanged="TextColorChannel_Changed" Margin="0,0,0,8"/>
+                  <TextBlock Text="α" Grid.Row="3" ToolTip="{Binding [EditorTextOpacity], Source={x:Static local:TextTable.Instance}}"/><Slider x:Name="TextAlphaSlider" Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="255" Value="255" ValueChanged="TextColorChannel_Changed"/>
+                </Grid>
+              </Expander>
+            </StackPanel>
+            <StackPanel x:Name="StillTools" Visibility="Collapsed" Margin="0,0,0,12">
+              <TextBlock Text="{Binding [EditorLayerDuration], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
+              <TextBox x:Name="LayerDurationBox" Padding="6,4" Margin="0,4,0,6"/>
+              <Button Style="{StaticResource EditorButton}" Content="{Binding [EditorApplyDuration], Source={x:Static local:TextTable.Instance}}" Click="ApplyLayerDuration_Click" Margin="0"/>
+            </StackPanel>
             <StackPanel x:Name="FrameTools">
               <TextBlock Text="{Binding [EditorVisualHint], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
               <Button Style="{StaticResource EditorButton}" Content="{Binding [EditorFillFrame], Source={x:Static local:TextTable.Instance}}" Click="FillFrame_Click" Margin="0,0,0,7"/>
@@ -136,9 +187,11 @@
               </StackPanel>
               </Expander>
             </StackPanel>
+            <StackPanel x:Name="VolumeTools">
             <TextBlock Text="{Binding [EditorVolume], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5"/>
             <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" Value="100" TickFrequency="10" ValueChanged="Volume_Changed" ToolTip="{Binding [EditorVolume], Source={x:Static local:TextTable.Instance}}"/>
             <TextBlock x:Name="VolumeLabel" Text="100%" Margin="0,2,0,8"/>
+            </StackPanel>
             <TextBlock Text="{Binding [EditorTimelineStart], Source={x:Static local:TextTable.Instance}}" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
             <TextBox x:Name="TrackPositionBox" FontFamily="Consolas" Padding="6,4" Margin="0,4,0,6"/>
             <Button x:Name="ApplyPositionButton" Style="{StaticResource EditorButton}" Content="{Binding [EditorApplyPosition], Source={x:Static local:TextTable.Instance}}" Click="ApplyPosition_Click"/>
@@ -173,9 +226,11 @@
         <Button x:Name="CutRangeButton" Style="{StaticResource EditorButton}" Tag="{StaticResource EditorIconSplit}" Content="{Binding [EditorCutRange], Source={x:Static local:TextTable.Instance}}" Click="CutRange_Click" ToolTip="Ctrl+X"/>
         <TextBlock x:Name="RangeLabel" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="11" Margin="4,0,0,0"/>
       </WrapPanel>
-      <WrapPanel x:Name="ImportTools" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,7,0,0">
+      <WrapPanel x:Name="ImportTools" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,7,0,0" ToolTip="{Binding [EditorDropHint], Source={x:Static local:TextTable.Instance}}">
         <Button x:Name="AddVideoButton" Style="{StaticResource EditorButton}" Tag="{StaticResource EditorIconVideo}" Content="{Binding [EditorAddVideo], Source={x:Static local:TextTable.Instance}}" Click="AddVideo_Click"/>
         <Button x:Name="AddAudioButton" Style="{StaticResource EditorButton}" Tag="{StaticResource EditorIconAudio}" Content="{Binding [EditorAddAudio], Source={x:Static local:TextTable.Instance}}" Click="AddAudio_Click"/>
+        <Button x:Name="AddImageButton" Style="{StaticResource EditorButton}" Content="{Binding [EditorAddImage], Source={x:Static local:TextTable.Instance}}" Click="AddImage_Click"/>
+        <Button x:Name="AddTextButton" Style="{StaticResource EditorButton}" Content="{Binding [EditorAddText], Source={x:Static local:TextTable.Instance}}" Click="AddText_Click"/>
         <Button Style="{StaticResource EditorButton}" Tag="{StaticResource EditorIconTrack}" Content="{Binding [EditorNewVideoTrack], Source={x:Static local:TextTable.Instance}}" Click="NewVideoTrack_Click"/>
         <Button Style="{StaticResource EditorButton}" Tag="{StaticResource EditorIconTrack}" Content="{Binding [EditorNewAudioTrack], Source={x:Static local:TextTable.Instance}}" Click="NewAudioTrack_Click"/>
         <Button x:Name="RemoveTrackButton" Style="{StaticResource EditorButton}" Content="{Binding [EditorRemoveTrack], Source={x:Static local:TextTable.Instance}}" Click="RemoveTrack_Click"/>

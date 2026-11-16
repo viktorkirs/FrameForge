@@ -30,7 +30,7 @@ public partial class VideoEditorWindow
                 Filter = "FrameForge project (*.ffproj)|*.ffproj", DefaultExt = VideoEditProjectFile.Extension, AddExtension = true,
                 OverwritePrompt = true, Title = Loc.Get("EditorSaveProject"),
                 InitialDirectory = Path.GetDirectoryName(_projectPath ?? _sourcePath),
-                FileName = Path.GetFileNameWithoutExtension(_projectPath ?? _sourcePath) + VideoEditProjectFile.Extension
+                FileName = (Path.GetFileNameWithoutExtension(_projectPath ?? _sourcePath) ?? "Project") + VideoEditProjectFile.Extension
             };
             if (dialog.ShowDialog(this) != true) return false;
             path = dialog.FileName;
@@ -74,6 +74,8 @@ public partial class VideoEditorWindow
             var previews = new Dictionary<string, VideoEditorPreview>(StringComparer.OrdinalIgnoreCase);
             var durations = new Dictionary<string, TimeSpan>(StringComparer.OrdinalIgnoreCase);
             var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var images = new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            var texts = new Dictionary<Guid, (VideoEditText Text, System.Windows.Media.Imaging.BitmapSource Bitmap)>();
             VideoEditSnapshot snapshot = project.Timeline;
             bool relinked = false;
             foreach (string source in VideoEditProjectFile.MediaPaths(snapshot))
@@ -84,15 +86,18 @@ public partial class VideoEditorWindow
                     var dialog = new OpenFileDialog
                     {
                         Title = Loc.Format("EditorLocateMedia", Path.GetFileName(source)), FileName = Path.GetFileName(source),
-                        Filter = "Media|*.mp4;*.mov;*.m4v;*.wmv;*.avi;*.wav;*.mp3;*.flac;*.m4a|All files|*.*", CheckFileExists = true
+                        Filter = "Media|*.mp4;*.mov;*.m4v;*.wmv;*.avi;*.wav;*.mp3;*.flac;*.m4a;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|All files|*.*", CheckFileExists = true
                     };
                     if (dialog.ShowDialog(this) != true) throw new FileNotFoundException(Loc.Format("EditorMissingMedia", source));
                     sourcePath = Path.GetFullPath(dialog.FileName); relinked = true;
                 }
                 replacements[source] = sourcePath;
+                bool image = snapshot.Tracks.SelectMany(track => track.Clips).Any(clip => clip.Kind == VideoEditClipKind.Image && clip.SourcePath == source);
                 bool video = snapshot.Clips.Any(clip => (clip.SourcePath ?? snapshot.SourcePath) == source) ||
-                    snapshot.Tracks.Any(track => track.Kind == VideoEditTrackKind.Video && track.Clips.Any(clip => clip.SourcePath == source));
-                if (video)
+                    snapshot.Tracks.Any(track => track.Kind == VideoEditTrackKind.Video && track.Clips.Any(clip => clip.Kind == VideoEditClipKind.Media && clip.SourcePath == source));
+                if (image)
+                { images[sourcePath] = VideoEditorVisuals.ReadImage(sourcePath); durations[sourcePath] = TimeSpan.FromDays(7); }
+                else if (video)
                 {
                     VideoEditorPreview preview = await VideoEditorMedia.OpenPreviewAsync(sourcePath);
                     previews[sourcePath] = preview; durations[sourcePath] = preview.Source.Duration;
@@ -102,6 +107,7 @@ public partial class VideoEditorWindow
             }
             VideoEditClip MapClip(VideoEditClip clip)
             {
+                if (clip.Kind == VideoEditClipKind.Text) { texts[clip.Id] = (clip.Text!, VideoEditorVisuals.RenderText(clip.Text!)); return clip; }
                 string replacement = replacements[clip.SourcePath ?? snapshot.SourcePath!];
                 if (clip.End > durations[replacement]) throw new InvalidDataException(Loc.Format("EditorMediaChanged", replacement));
                 return clip with { SourcePath = replacement, OriginalDuration = durations[replacement] };
@@ -115,8 +121,10 @@ public partial class VideoEditorWindow
             // Stage and validate all media before replacing the current editing session.
             _waveformCancellation?.Cancel(); _waveformCancellation?.Dispose();
             _waveformCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-            Player.Close(); CloseTrackPlayback(); _previews.Clear();
+            Player.Close(); CloseTrackPlayback(); _previews.Clear(); ClearVisualAssets();
             foreach (var entry in previews) _previews.Add(entry.Key, entry.Value);
+            foreach (var entry in images) _imageBitmaps.Add(entry.Key, entry.Value);
+            foreach (var entry in texts) _textBitmaps.Add(entry.Key, entry.Value);
             _timeline = VideoEditTimeline.FromSnapshot(snapshot);
             _source = new(snapshot.SourceDuration, project.Width, project.Height, project.FrameRate, false);
             _sourcePath = snapshot.SourcePath ?? previews.Keys.FirstOrDefault() ?? Path.GetFullPath(path);
@@ -136,7 +144,7 @@ public partial class VideoEditorWindow
             ConfigureOutputFormats();
             RefreshSelection(); RefreshTracks(); UpdateExtent();
             Seek(project.Playhead);
-            foreach (var entry in durations) _ = ReadAdditionalWaveformAsync(entry.Key, entry.Value);
+            foreach (var entry in durations.Where(entry => !images.ContainsKey(entry.Key))) _ = ReadAdditionalWaveformAsync(entry.Key, entry.Value);
             _ = ReadThumbnailsAsync();
             StatusText.Text = Loc.Get("EditorProjectOpened");
         }

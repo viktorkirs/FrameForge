@@ -71,11 +71,14 @@ internal static partial class Program
             var legacy = new VideoEditProject(timeline.Snapshot() with { Clips = timeline.Clips.Select(clip => clip with { Position = TimeSpan.Zero }).ToArray() }, 320, 180, 30) { Version = 1 };
             File.WriteAllText(path, JsonSerializer.Serialize(legacy, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, IgnoreReadOnlyProperties = true }));
             VideoEditProject loaded = VideoEditProjectFile.Load(path);
-            Check(loaded.Version == 2 && loaded.Timeline.Clips.Select(clip => clip.Position.TotalSeconds).SequenceEqual(new[] { 0d, 2d, 4d }), "Old projects no longer open at their original times");
+            Check(loaded.Version == 3 && loaded.Timeline.Clips.Select(clip => clip.Position.TotalSeconds).SequenceEqual(new[] { 0d, 2d, 4d }), "Old projects no longer open at their original times");
             var restored = VideoEditTimeline.FromSnapshot(loaded.Timeline); restored.SelectedIndex = 1; restored.SetSelectedPosition(TimeSpan.FromSeconds(7));
             VideoEditProjectFile.Save(path, loaded with { Timeline = restored.Snapshot(), TrackHeightScale = .55, Zoom = .5 });
             VideoEditProject again = VideoEditProjectFile.Load(path);
             Check(again.Timeline.Clips.Any(clip => clip.Position.TotalSeconds == 7) && again.TrackHeightScale == .55 && again.Zoom == .5, "New projects lost gaps, compact tracks or timeline zoom");
+            File.WriteAllText(path, File.ReadAllText(path).Replace("\"version\": 3", "\"version\": 2"));
+            VideoEditProject versionTwo = VideoEditProjectFile.Load(path);
+            Check(versionTwo.Version == 3 && versionTwo.Timeline.Clips.SequenceEqual(again.Timeline.Clips), "Version-two positions changed during migration");
         });
     }
 

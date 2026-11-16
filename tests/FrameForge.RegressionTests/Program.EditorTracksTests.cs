@@ -120,6 +120,7 @@ internal static partial class Program
         Test("opening the editor hides the confirmed capture frame and restores it on close", () => EditorHidesCaptureFrame(source));
         RunEditorProjectMediaTests(source, silent);
         RunEditorWorkspaceUiTests(source);
+        RunEditorVisualMediaTests(source, silent, wave);
     }
 
     static void CreateEditorPattern(string path)
